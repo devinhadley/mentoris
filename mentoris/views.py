@@ -664,8 +664,10 @@ def user_info(request, user_id):
     try:
         email = Email.objects.get(user=user_profile, is_primary=True)
         other_emails = Email.objects.filter(user=user_profile, is_primary=False)
-        other_emailss = [obj.email_address for obj in other_emails]
-        other_email = ", ".join(other_emailss)
+        # other_emailss = [obj.email_address for obj in other_emails]
+        other_email = [{"email_address": obj.email_address} for obj in other_emails]
+        # other_email = ", ".join(other_emailss)
+        print(other_email)
     except Email.DoesNotExist:
         email = None
     return render(

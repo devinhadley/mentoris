@@ -48,7 +48,7 @@
                 </div>
                     <div class="input-group">
                       <span class="input-group-text">Other Email Addresses</span>
-                      <input type="email" multiple class="form-control" name="other_emails" aria-label="other-emails" value = "{{other_email}}" placeholder="email1@email.com, email2@email.com"></input>
+                      <input type="email" multiple class="form-control" name="other_emails" aria-label="other-emails" value="{% for email_dict in other_email %}{{ email_dict.email_address }}{% if not forloop.last %},&nbsp;{% endif %}{% endfor %}" placeholder="email1@email.com, email2@email.com"></input>
                     </div>
                 </div> 
           </div>
@@ -87,7 +87,7 @@
                 <button type="button" onclick="window.location.href='/reset_password'" class="btn btn-primary">Reset Password</button>
                 <button type="button" class="btn btn-primary">Edit Handles</button>
                 <button type="button" class="btn btn-primary">Request Authentication</button>
-                <button type="submit" class="btn btn-primary" style="margin-left: 100px;">Save</button>
+                <button type="submit" class="btn btn-primary">Save</button>
                 </div>
           </div>
           </div>
