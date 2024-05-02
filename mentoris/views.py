@@ -457,6 +457,7 @@ def grab_verification_info(user_ids):
 
 def user_info(request, user_id):
     user_profile = get_object_or_404(User, user_id=user_id)
+    other_email = None
     try:
         email = Email.objects.get(user_id=user_id, is_primary=True)
         other_emails = Email.objects.filter(user_id=user_id, is_primary=False)
@@ -933,6 +934,7 @@ def edit_support(request, quiz_id, support_id):
 
             support_loc.title_latex=support_title
             support_loc.content_latex=support_content
+            support_loc.creator=request.user
             support_loc.save()
 
             for attachment in support_attachments:
