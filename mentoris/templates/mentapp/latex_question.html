@@ -29,14 +29,6 @@
     </script>
 
     <style>
-        latex-js {
-            display: inline-block;
-            width: 100%;
-            border: 1px solid black;
-            height: 300px;
-            overflow: auto;
-        }
-
         /* Define a custom class for your textarea */
         .latex-input-field {
             width: 100%;
@@ -49,6 +41,11 @@
             --textwidth: 100% !important;
             --marginleftwidth: 0% !important;
             --marginrightwidth: 0% !important;
+            display: inline-block;
+            width: 100%;
+            border: 1px solid black;
+            height: 300px;
+            overflow: auto;
         }
     </style>
 
@@ -56,82 +53,95 @@
 </head>
 
 <body>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.0/jquery.min.js"></script>
     <div class="content">
         <iframe src="header.html" width="100%" height="95px" frameBorder="0"
             style="display: block; padding: 0px; margin: 0px;"></iframe>
         <button id="back_button" onclick="confirmLeave()" type="button">Back</button>
 
+        <!--Container For Entire Page-->
         <div class="container">
+            
             <form method="POST" action="{% url 'latex_question' %}" enctype="multipart/form-data">
                 {% csrf_token %}
 
+                <!--Input Row (Question, Answer, Rubric)-->
                 <div class="row">
+
+                    <!--Question Input-->
                     <div class="col-4">
-                        <label for="latex-input">Enter question here in LaTeX:</label>
+                        <label for="question-input">Enter question here in LaTeX:</label>
                         <div class="container" style="margin-top: 10px"></div>
-                        {{ form.latex_question }}
-                        <input type="hidden" value="{{ question }}" name="question_hidden" />
+                        <textarea id="question-input" class="latex-input-field" rows ="10" cols = "40">{{ question }}Helo Woorld</textarea>
                     </div>
+
+                    <!--Answer Input-->
                     <div class="col-4">
-                        <label for="latex-input">Enter answer in LaTeX:</label>
+                        <label for="answer-input">Enter answer in LaTeX:</label>
                         <div class="container" style="margin-top: 10px"></div>
-                        {{ form.latex_answer }}
-                        <input type="hidden" value="{{ answer }}" name="answer_hidden" />
+                        <textarea id="answer-input" class="latex-input-field" rows ="10" cols = "40"></textarea>
                     </div>
+
+                    <!--Grading (Rubric) Input-->
                     <div class="col-4">
-                        <label for="latex-input">Enter grading rubric in LaTeX:</label>
+                        <label for="grading-input">Enter grading rubric in LaTeX:</label>
                         <div class="container" style="margin-top: 10px"></div>
-                        {{ form.latex_grading }}
-                        <input type="hidden" value="{{ grading }}" name="grading_hidden" />
+                        <textarea id="grading-input" class="latex-input-field" rows ="10" cols = "40"></textarea>
                     </div>
                 </div>
 
+                <!--Insert gap between input and output-->
                 <div class="container" style="margin-top: 10px"></div>
 
-                <div class="row">
-                    <div class="col-4">
-                        <label for="rendered-question">LaTeX render of question:</label>
-                        <latex-js id="rendered-question" class="latex-js-custom">
-                            {{ question }}
-                        </latex-js>
-                        <div class="container" style="margin-top: 30px"></div>
-                        <button type="submit" class="btn btn-primary" id="render-button-1"
-                            style="height: 75px; width: 100%" name="question-button">
-                            Render
-                        </button>
-                    </div>
+                   <!--Output (Render) Row  (Question, Answer, Rubric)-->
+                    <div class="row">
 
-                    <div class="col-4">
-                        <label for="rendered-answer">LaTeX render of answer:</label>
-                        <latex-js id="rendered-answer" class="latex-js-custom">
-                            {{ answer }}
-                        </latex-js>
-                        <div class="container" style="margin-top: 30px"></div>
-                        <button type="submit" class="btn btn-primary" id="render-button-2"
-                            style="height: 75px; width: 100%" name="answer-button">
-                            Render
-                        </button>
-                    </div>
+                        <!--Question Output-->
+                        <div class="col-4">
+                            <label for="question-output">LaTeX render of question:</label>
+                            <div id="question-output" class="latex-js-custom" rows="10" cols="40">
 
-                    <div class="col-4">
-                        <label for="rendered-grading">LaTeX render of rubric:</label>
-                        <latex-js id="rendered-grading" class="latex-js-custom">
-                            {{ grading }}
-                        </latex-js>
-                        <div class="container" style="margin-top: 30px"></div>
-                        <button type="submit" class="btn btn-primary" id="render-button-3"
-                            style="height: 75px; width: 100%" name="grading-button">
-                            Render
-                        </button>
+                            </div>
+                            <div class="container" style="margin-top: 30px"></div>
+                            <button type="button" class="btn btn-primary" id="question-button"
+                                style="height: 75px; width: 100%" name="question-button">
+                                Render
+                            </button>
+                        </div>
+
+                        <!--Answer Output-->
+                        <div class="col-4">
+                            <label for="answer-output">LaTeX render of answer:</label>
+                            <div id="answer-output" class="latex-js-custom" rows="10" cols="40">
+
+                            </div>
+                            <div class="container" style="margin-top: 30px"></div>
+                            <button type="button" class="btn btn-primary" id="answer-button"
+                                style="height: 75px; width: 100%" name="answer-button">
+                                Render
+                            </button>
+                        </div>
+                        
+                        <!--Grading (Rubric) Output-->
+                        <div class="col-4">
+                            <label for="grading-output">LaTeX render of rubric:</label>
+                            <div id="grading-output" class="latex-js-custom" rows="10" cols="40">
+
+                            </div>
+                            <div class="container" style="margin-top: 30px"></div>
+                            <button type="button" class="btn btn-primary" id="grading-button"
+                                style="height: 75px; width: 100%" name="grading-button">
+                                Render
+                            </button>
+                        </div>
                     </div>
-                </div>
 
                 <div class="container" style="margin-top: 50px"></div>
                 <div class="form-group" style="margin-bottom: 10px">
                     <label style="margin-bottom: 5px;" class="btn btn-primary" for="attachments">Add
                         Attachment(s)</label>
                     <input style="display: none; " class="form-control" name="attachments" type="file" id="attachments"
-                        accept=".pdf, .png, .jpg" multiple />
+                        accept=".png, .jpg" multiple />
                     <br>
                 </div>
 
@@ -227,11 +237,11 @@
                     </div>
                     <div class="col-2 d-flex align-items-center justify-content-center">
                         <button type="submit" name="submit-question" class="btn btn-primary" style="
-                                    height: 100%;
-                                    width: 200%;
-                                    font-size: x-large;
-                                ">
-                            Submit Question
+                        height: 100%;
+                        width: 200%;
+                        font-size: x-large;
+                    ">
+                        Save Changes
                         </button>
                     </div>
                 </div>
@@ -251,26 +261,178 @@
         <iframe src="footer.html" width="100%" frameborder="0"></iframe>
     </div>
     <script>
-        var selectedVolume = document.getElementById("volume").value;
-        document
-            .getElementById("volume")
-            .addEventListener("change", function () {
-                var button = document.getElementById("volume-button");
-                button.click();
-            });
 
-        document.getElementById('attachments').addEventListener('change', function (event) {
-                const files = event.target.files;
-                const selectedFilesDiv = document.getElementById('selectedFiles');
+        function display_attachments(filenames, urls){
+            let selectedFilesDiv = document.getElementById("selectedFiles")
+            for (let i = 0; i < filenames.length; ++i) {
+                let filename = filenames[i];
+                let url = urls[i];
+                console.log(filename);
 
-                selectedFilesDiv.innerHTML = '';
+                const fileDiv = document.createElement('div');
+                fileDiv.style.width = "40em";
+                fileDiv.classList.add('bordered');
+                
+                const icon = document.createElement('img');
+                icon.src = url;
+                icon.height = '100';
+                icon.width = '100';
+                icon.style.float = "left";
+                icon.style.objectFit = "cover";
+                fileDiv.appendChild(icon);
 
-                for (const file of files) {
-                    const fileNameDiv = document.createElement('div');
-                    fileNameDiv.textContent = file.name;
-                    selectedFilesDiv.appendChild(fileNameDiv);
+                const label = document.createElement('p');
+                label.textContent = filename;
+                label.style.float = "left";
+                label.style.paddingLeft = "2em";
+                fileDiv.appendChild(label);
+
+                const deleteButton = document.createElement('button');
+                deleteButton.textContent = 'Delete';
+                deleteButton.style.float = 'right';
+                deleteButton.type = 'button';
+                deleteButton.addEventListener('click', function(event){
+                
+                    let request = $.ajax({
+                        type: "POST",
+                        headers:{'X-CSRFToken': "{{csrf_token}}"},
+                        url: "/edit_question/{{question_id}}/",
+                        dataType: 'json',
+                        data: {
+                            command: 'deleteAttachment',
+                            filename: filename,
+                        }
+                    });
+
+                    request.done(function(){
+                        console.log("done!!!!!!");
+                        event.target.parentElement.remove();
+                    });
+                });
+                fileDiv.appendChild(deleteButton);
+
+                selectedFilesDiv.appendChild(fileDiv);
+            }
+        }
+
+        function createLatexWrapper(input, names, urls, part, width){
+            let latex_wrapper = document.createElement('iframe');
+            console.log(latex_wrapper.src);
+            latex_wrapper.src = "/latex_window/" + {{question_id}} + "/"+ part + "/" + width;
+            console.log( window.location.host);
+            console.log(latex_wrapper.src);
+            latex_wrapper.classList.add("container");
+            return latex_wrapper;
+        }
+
+        function renderOutput(input, names, urls, outputId, command){
+            let request = $.ajax({
+                type: "POST",
+                headers:{'X-CSRFToken': "{{csrf_token}}"},
+                url: "/edit_question/{{question_id}}/",
+                dataType: 'json',
+                data: {
+                    command: command,
+                    input: input,
                 }
             });
+            request.done(function(data){
+                let outputElement = document.getElementById(outputId);
+                console.log(outputElement);
+                outputElement.innerHTML = "";
+                console.log("EMPTYIED");
+                console.log(outputElement.getBoundingClientRect().right);
+                console.log(outputElement);
+                const right = outputElement.getBoundingClientRect().right;
+                const left =  outputElement.getBoundingClientRect().left;
+                const width = right - left;
+                console.log("left");
+                console.log(left);
+                let latex_wrapper = createLatexWrapper(input, names, urls, command, width);
+                console.log(left - right);
+                outputElement.appendChild(latex_wrapper);
+                console.log(outputElement);
+                console.log("DONE WITH POST");
+                initLatexFrame(latex_wrapper, width);
+            });
+            
+
+            /*let srcdoc = latex_wrapper.srcdoc;
+            latex_wrapper.contentWindow.location.host =  window.location.host;
+            latex_wrapper.srcdoc = srcdoc;
+            latex_wrapper.referrerpolicy = "origin";
+            console.log(latex_wrapper.contentWindow)
+            console.log(latex_wrapper.contentWindow.location.host);*/
+        }
+
+        function initButtons(names, urls){
+            let gradingInput = document.getElementById("grading-input");
+            let renderGradingButton = document.getElementById("grading-button");
+            renderGradingButton.onclick = function(){renderOutput(gradingInput.value, names, urls, "grading-output", "rubric")};
+
+            let answerInput = document.getElementById("answer-input");
+            let renderAnswerButton = document.getElementById("answer-button");
+            renderAnswerButton.onclick = function(){renderOutput(answerInput.value, names, urls, "answer-output", "answer")};
+
+            let questionInput = document.getElementById("question-input");
+            let renderQuestionButton = document.getElementById("question-button");
+            renderQuestionButton.onclick = function(){renderOutput(questionInput.value, names, urls, "question-output", "question")};
+        }
+
+        $(document).ready(function() {
+            let request = $.ajax({
+                type: "GET",
+                headers:{'X-CSRFToken': "{{csrf_token}}"},
+                url: "/fetch_attachments/{{question_id}}",
+                dataType: 'json'
+            });
+            request.done(function(data){
+                console.log("request done!");
+                let filenames = [];
+                let urls = [];
+                console.log("attempting to add...");
+                for(const attachment of data["attachments"]){
+                    filenames.push(attachment["filename"]);
+                    urls.push(attachment["url"]);
+                }
+                console.log(urls);
+                display_attachments(filenames, urls);
+                initButtons(filenames, urls);
+            });
+        
+                var selectedVolume = document.getElementById("volume").value;
+                document.getElementById("volume").addEventListener("change", function () {
+                    var button = document.getElementById("volume-button");
+                    button.click();
+            }); 
+        });
+
+        document.getElementById('attachments').addEventListener('change', function (event) {
+            let files = event.target.files;
+            for(const file of files){
+                let formData = new FormData();
+                formData.append("command", "upload");
+                formData.append(file.name, file);
+                let request = $.ajax({
+                    type: "POST",
+                    headers:{'X-CSRFToken': "{{csrf_token}}"},
+                    url: "/edit_question/{{question_id}}/",
+                    dataType: 'json',
+                    contentType: false,
+                    processData: false,
+                    data: formData
+                });
+                request.done(function(data){
+                    let filenames = [];
+                    let urls = [];
+                    filenames.push(data['name']);
+                    urls.push(data['url']);
+                    display_attachments(filenames, urls);
+                });
+
+            }
+            this.value = null;
+        });
 
             function confirmLeave() {
                     const modal = document.getElementById('customModal');
