@@ -214,8 +214,17 @@ async function display_questions(data, question_container_id, button_function, a
         latex_wrapper.src = "/latex_window/" + data[i]["question_id"] + "/"+ 
                             "question" + "/" + widthHTMLElement(container) + "/" ;
         border_wrapper.appendChild(latex_wrapper);
+
         list_item.appendChild(border_wrapper);
         container.appendChild(list_item);
         initLatexFrame(latex_wrapper);
+        latex_wrapper.contentWindow.addEventListener(
+            "message",
+            (event) => {
+                border_wrapper.style.height= (200 + latex_wrapper.contentDocument.body.scrollHeight) + "px";
+            },
+            false,
+          );
+
     };
 }

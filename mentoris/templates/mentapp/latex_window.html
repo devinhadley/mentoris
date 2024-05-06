@@ -31,6 +31,16 @@
                     urls.push(attachment["url"]);
                 }
                 generate_latex(data["input"], filenames, urls, {{width}});
+
+                 // Ideally the target origin would be specified,
+                 // however, this is left out since no sensitive data
+                 // is being sent and to make testing easier
+                rs = new ResizeObserver((entries) => {
+                    for (const entry of entries) {
+                        window.postMessage("message");
+                }});
+
+                rs.observe(document.body);
             });
     </script>
     </body>
