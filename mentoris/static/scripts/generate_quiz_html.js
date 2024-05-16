@@ -211,7 +211,7 @@ async function display_questions(data, question_container_id, button_function, a
 
         // add LaTeX
         let latex_wrapper = document.createElement("iframe");
-        latex_wrapper.src = "/latex_window/" + data[i]["question_id"] + "/"+ 
+        latex_wrapper.src = "/latex_window/question/" + data[i]["question_id"] + "/"+ 
                             "question" + "/" + widthHTMLElement(container) + "/" ;
         border_wrapper.appendChild(latex_wrapper);
 

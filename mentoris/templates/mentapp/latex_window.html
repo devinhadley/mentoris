@@ -13,16 +13,26 @@
     
     {% load static %}
     <script type = "text/javascript">
+        /**
+        * Makes request for attachments add displays them using the custom LaTeX.js macro.
+        * Questions and supports require slightly different requests.
+        * @param {boolean} isQuestion - A boolean representing if a question or support is being rendered. 
+        */
+        function makeAttachmentRequest(isQuestion){
+            let getURL = "";
+            if(isQuestion){
+                getURL = "/fetch_attachments_inputs/question/{{question_id}}/{{part}}"
+            } else {
+                getURL = "/fetch_attachments_inputs/support/{{support_id}}/"
+            }
             let request = $.ajax({
                 type: "GET",
                 async: false,
                 headers:{'X-CSRFToken': "{{csrf_token}}"},
-                url: "/fetch_attachments_inputs/{{question_id}}/{{part}}",
+                url: getURL,
                 dataType: 'json'
             });
             request.done(function(data){
-                console.log("request done!");
-                console.log(data);
                 let filenames = [];
                 let urls = [];
                 console.log("attempting to add...");
@@ -35,13 +45,27 @@
                  // Ideally the target origin would be specified,
                  // however, this is left out since no sensitive data
                  // is being sent and to make testing easier
+                 // This observer notifies any webpages this page is embedded in
+                 // that are listening to it of resizes. This enables dynamic 
+                 // line width scaling for attachments.
                 rs = new ResizeObserver((entries) => {
                     for (const entry of entries) {
                         window.postMessage("message");
                 }});
 
                 rs.observe(document.body);
-            });
+        });
+    }
+
+    /*
+    * Regardless of if a question or support is being rendered,
+    * both populate the template with what type they are.
+    */
+    if( "{{type}}" == "question") {
+        makeAttachmentRequest(true);
+    } else if ( "{{type}}" == "support") {
+        makeAttachmentRequest(false);
+    }
     </script>
     </body>
 </html>

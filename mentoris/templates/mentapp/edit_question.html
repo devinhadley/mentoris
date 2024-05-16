@@ -364,13 +364,12 @@
             let bigPreview = document.getElementById("big-preview");
             outputElement.appendChild(smallPreview);
 
-            smallPreview.src = "/latex_window/" + {{question_id}} + "/"+ part + "/" + widthHTMLElement(smallPreview.contentDocument.body) + "/" ;
-            bigPreview.src =  "/latex_window/" + {{question_id}} + "/"+ part + "/" + widthHTMLElement(bigPreview.contentDocument.body) + "/" ;
+            smallPreview.src = "/latex_window/question/" + {{question_id}} + "/"+ part + "/" + widthHTMLElement(smallPreview.contentDocument.body) + "/" ;
+            bigPreview.src =  "/latex_window/question/" + {{question_id}} + "/"+ part + "/" + widthHTMLElement(bigPreview.contentDocument.body) + "/" ;
 
             initLatexFrame(bigPreview);
             initLatexFrame(smallPreview);
         }
-
 
         /**
         * Updates the database to contain the current state of 
@@ -422,7 +421,7 @@
             let request = $.ajax({
                 type: "GET",
                 headers:{'X-CSRFToken': "{{csrf_token}}"},
-                url: "/fetch_attachments/{{question_id}}/",
+                url: "/fetch_attachments/question/{{question_id}}/",
                 dataType: 'json'
             });
             request.done(function(data){

@@ -37,6 +37,7 @@ from datetime import date
 from mentoris.latex_to_pdf import latex_to_pdf
 
 
+
 def latex(request, question_id):
     volumes = (
         Volume.objects.values_list("volume_id", flat=True)
@@ -115,7 +116,6 @@ def latex(request, question_id):
         chapter_locs = Chapter_Loc.objects.filter(
             chapter__chapter_id__in=chapters
         ).distinct()
-
 
         if "submit-question" in request.POST:
             question_object = Question()
@@ -881,7 +881,7 @@ def edit_quiz_add_support(request, quiz_id):
             support_instances = support_instances.filter(creator=creator_filter)
 
         if title_filter:
-            support_instances = support_instances.filter(title_latex=title_filter)
+            support_instances = support_instances.filter(title=title_filter)
 
         supports_list = list()
 
@@ -902,14 +902,17 @@ def edit_quiz_add_support(request, quiz_id):
 
             support_values = dict()
             support_values["support_id"] = support.support_id
+            print("Upport I")
+            print(support.support_id)
+
 
             if support.support.volume_id.volume_id is not None:
                 support_values["volume"] = support.support.volume_id.volume_id
             else:
                 support_values["volume"] = ""
 
-            if support.title_latex is not None:
-                support_values["title"] = support.title_latex
+            if support.title is not None:
+                support_values["title"] = support.title
             else:
                 support_values["title"] = ""
 
@@ -1078,7 +1081,7 @@ def create_support(request):
 
             support_loc = Support_Loc(
                 support=support,
-                title_latex=support_title,
+                title=support_title,
                 content_latex=support_content,
                 creator_id=creators.first()[0],
                 approver_id=creators.first()[0],
@@ -1150,7 +1153,7 @@ def create_question(request):
 
     return render(request, 'mentapp/main.html')
 
-def grab_attachments(question_id):
+def grab_attachments_question(question_id):
     question =  get_object_or_404(Question, question_id = question_id)
     question_loc = get_object_or_404(Question_Loc, question = question, lang_code = "ENG", dialect_code = "US")
     attachments = Question_Attachment.objects.filter(question = question_loc)
@@ -1164,16 +1167,16 @@ def grab_attachments(question_id):
 
     return attachmentsList
 
-
-def fetch_attachments(request, question_id):
-    attachmentsList = grab_attachments(question_id)
+# Returns a JSON response with only the attachment files and names
+def fetch_attachments_question(request, question_id):
+    attachmentsList = grab_attachments_question(question_id)
     return JsonResponse({"attachments": attachmentsList})
 
-def fetch_attachments_inputs(request, question_id, part):
+# Returns a JSON response with the attachment files and names and the LaTeX
+def fetch_attachments_inputs_question(request, question_id, part):
     question =  get_object_or_404(Question, question_id = question_id)
     question_loc = get_object_or_404(Question_Loc, question = question, lang_code = "ENG", dialect_code = "US")
-    response = fetch_attachments(request, question_id)
-    attachmentsList = grab_attachments(question_id)
+    attachmentsList = grab_attachments_question(question_id)
     if part == "question":
         input = question_loc.question_latex
     elif part == "answer":
@@ -1182,19 +1185,62 @@ def fetch_attachments_inputs(request, question_id, part):
         input = question_loc.rubric_latex
 
     return JsonResponse({"attachments": attachmentsList, "input" : input})
+
+def grab_attachments_support(support_id):
+    support =  get_object_or_404(Support, support_id = support_id)
+    support_loc = get_object_or_404(Support_Loc, support = support, lang_code = "ENG", dialect_code = "US")
+    attachments = Support_Attachment.objects.filter(support = support_loc, lang_code = "ENG", dialect_code = "US")
+    attachmentsList = list()
+
+    for attachment in attachments:
+        attachmentDict = dict()
+        attachmentDict["filename"] = attachment.filename
+        attachmentDict["url"] = attachment.blob_key.file.url
+        attachmentsList.append(attachmentDict)
+        print("oun omething!")
+        print(attachment.filename)
+
+    return attachmentsList
+
+# Returns a JSON response with only the attachment files and names
+def fetch_attachments_support(request, support_id):
+    attachmentsList = grab_attachments_support(support_id)
+    return JsonResponse({"attachments": attachmentsList})
+
+# Returns a JSON response with the attachment files and names and the LaTeX
+def fetch_attachments_inputs_support(request, support_id):
+    print("attempt!")
+    print(support_id)
+    support =  get_object_or_404(Support, support_id = support_id)
+    support_Loc = get_object_or_404(Support_Loc, support = support, lang_code="ENG", dialect_code="US")
+    input = support_Loc.content_latex
+    print(input)
+    attachmentsList = grab_attachments_support(support_id)
+    return JsonResponse({"attachments": attachmentsList, "input" : input})
     
 
-def latex_window(request, question_id, part, width):
-        return render(
-            request,
-            "mentapp/latex_window.html",
-            {
-                "part": part,
-                "question_id": question_id,
-                "width": width
-            }
-        )
+def latex_window_question(request, question_id, part, width):
+    return render(
+        request,
+        "mentapp/latex_window.html",
+        {
+            "type": "question",
+            "part": part,
+            "question_id": question_id,
+            "width": width
+        }
+    )
 
+def latex_window_support(request, support_id, width):
+    return render(
+        request,
+        "mentapp/latex_window.html",
+        {
+            "type": "support",
+            "support_id": support_id,
+            "width": width
+        }
+    )
 
 def edit_question(request, question_id):
     question_object =  get_object_or_404(Question, question_id = question_id)

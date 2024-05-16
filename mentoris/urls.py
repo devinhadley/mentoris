@@ -25,10 +25,15 @@ urlpatterns = [
     re_path(r".*/header.html/", views.header, name="header"),
     re_path(r".*/footer.html/", views.footer, name="footer"),
     path("admin/", admin.site.urls),
+
     # Depricated path("latex/", views.latex, name="latex_question"),
-    path("fetch_attachments/<int:question_id>/", views.fetch_attachments, name="fetch_attachments"),
-    path("fetch_attachments_inputs/<int:question_id>/<str:part>", views.fetch_attachments_inputs, name="fetch_attachments_inputs"),
-    path("latex_window/<int:question_id>/<str:part>/<int:width>/", views.latex_window, name = "latex_window"),
+
+    path("fetch_attachments/question/<int:question_id>/", views.fetch_attachments_question, name="fetch_attachments_question"),
+    path("fetch_attachments/support/<int:support_id>/", views.fetch_attachments_support, name="fetch_attachment_support"),
+    path("fetch_attachments_inputs/support/<int:support_id>/", views.fetch_attachments_inputs_support, name="fetch_attachments_inputs_support"),
+    path("fetch_attachments_inputs/question/<int:question_id>/<str:part>/", views.fetch_attachments_inputs_question, name="fetch_attachments_inputs_question"),
+    path("latex_window/question/<int:question_id>/<str:part>/<int:width>/", views.latex_window_question, name = "latex_window_question"),
+    path("latex_window/support/<int:support_id>/<int:width>/", views.latex_window_support, name="latex_window_support"),
     path("login/", views.login, name="login"),
     path("signUp/", views.sign_up, name="sign_up"),
     path("profile/", views.profile, name="profile"),
