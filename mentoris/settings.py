@@ -13,6 +13,8 @@ https://docs.djangoproject.com/en/4.1/ref/settings/
 import os
 from pathlib import Path
 
+from django.conf import settings
+
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -39,6 +41,7 @@ INSTALLED_APPS = [
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
+    "multiupload",
 ]
 
 MIDDLEWARE = [
@@ -56,7 +59,11 @@ ROOT_URLCONF = "mentoris.urls"
 TEMPLATES = [
     {
         "BACKEND": "django.template.backends.django.DjangoTemplates",
-        "DIRS": ["mentoris/templates", "mentapp/templates,"],
+        "DIRS": [
+            "mentoris/templates",
+            "mentapp/templates,",
+            os.path.join(settings.BASE_DIR, "/mentoris/templates/mentapp"),
+        ],
         "APP_DIRS": True,
         "OPTIONS": {
             "context_processors": [
@@ -75,11 +82,15 @@ WSGI_APPLICATION = "mentoris.wsgi.application"
 # https://docs.djangoproject.com/en/4.1/ref/settings/#databases
 
 DATABASES = {
-
- 
+    'default': {
+        'ENGINE': 'django.db.backends.postgresql_psycopg2',
+        'NAME': 'postgres',
+        'USER': 'postgres',
+        'PASSWORD': 'BDFLARcNQhmxHFtT44AV',
+        'HOST': 'mentorisdb.cmkrvc9icttm.us-west-2.rds.amazonaws.com',
+        'PORT': '5659',
+    }
 }
-
-
 
 STORAGES = {
     "default": {
@@ -149,3 +160,11 @@ AUTHENTICATION_BACKENDS = [
     "mentoris.emailauth.EmailAuthBackend",
     "django.contrib.auth.backends.ModelBackend",
 ]
+
+# Email Notifications
+EMAIL_BACKEND = "django_ses.SESBackend"
+EMAIL_HOST = "email-smtp.us-east-1.amazonaws.com"
+EMAIL_PORT = 465
+EMAIL_HOST_USER = "AKIAS5CSTZDUFJFNGP2Z"
+EMAIL_HOST_PASSWORD = "BIFxfnFCerF2f4JiRwLx8MYpRykHZDMSr8h7TLR3IleU"
+EMAIL_USE_TLS = True
