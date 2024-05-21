@@ -11,7 +11,10 @@ from mentapp.models import (
     Blob,
     Question_Attachment,
     Support_Attachment,
+    Support_Attachment,
 )
+
+TIMEOUT = 10  # try to render the PDF for 10 seconds before failing
 
 TIMEOUT = 10  # try to render the PDF for 10 seconds before failing
 
@@ -47,6 +50,7 @@ def getChapterNum(volume, chapter):
             break
     if chapterNum != -1:
         return "(" + str(chapterNum + 1) + "/" + str(numChapters) + ")"
+        return "(" + str(chapterNum + 1) + "/" + str(numChapters) + ")"
     else:
         print("Error: chapter not found")
         return "(X/X)"
@@ -67,7 +71,9 @@ quiz_data: quiz object
 
 
 def latex_to_pdf(latex_question_list, support_list, quiz_data):
+def latex_to_pdf(latex_question_list, support_list, quiz_data):
     script_path = os.path.dirname(__file__)
+    file_location = os.path.join(script_path, "..", "docs", "latex", "output_quiz.tex")
     file_location = os.path.join(script_path, "..", "docs", "latex", "output_quiz.tex")
     abs_file_location = os.path.abspath(file_location)
     output_file = open(abs_file_location, "w")
@@ -85,6 +91,7 @@ def latex_to_pdf(latex_question_list, support_list, quiz_data):
     output_file.write(r"\firstpageheader{}{}{}" + "\n")
 
     rendering = Quiz_Rendering()
+
 
     recent_id = 0
     try:
@@ -223,7 +230,25 @@ def latex_to_pdf(latex_question_list, support_list, quiz_data):
                 + latex_question
                 + "\n\n"
             )
+        for question_loc in latex_question_list:
+            latex_question = question_loc.question_latex
+            point = int(question_loc.question.point_value)
+            plural = "" if point == 1 else "s"
+            output_file.write(
+                r"\item ("
+                + str(point)
+                + r" point"
+                + plural
+                + r") "
+                + latex_question
+                + "\n\n"
+            )
 
+            attachment_list = Question_Attachment.objects.filter(question=question_loc)
+            for attachment in attachment_list:
+                blob = attachment.blob_key
+                temp_path = os.path.join(script_path, "..", "media", str(blob.file))
+                blob_path = os.path.abspath(temp_path)
             attachment_list = Question_Attachment.objects.filter(question=question_loc)
             for attachment in attachment_list:
                 blob = attachment.blob_key
@@ -233,7 +258,11 @@ def latex_to_pdf(latex_question_list, support_list, quiz_data):
                 final_path = os.path.join(
                     script_path, "..", "docs", "latex", blob.filename
                 )
+                final_path = os.path.join(
+                    script_path, "..", "docs", "latex", blob.filename
+                )
 
+                shutil.copy(blob_path, final_path)
                 shutil.copy(blob_path, final_path)
 
                 output_file.write(r"\vspace{0.2cm}" + "\n")
@@ -250,6 +279,9 @@ def latex_to_pdf(latex_question_list, support_list, quiz_data):
 
                 files_to_remove.append(final_path)
 
+            pages_required = question_loc.question.pages_required
+            spacingString = pagesRequiredToSpacing(pages_required)
+            output_file.write(r"\vspace{" + spacingString + r"}" + "\n\n")
             pages_required = question_loc.question.pages_required
             spacingString = pagesRequiredToSpacing(pages_required)
             output_file.write(r"\vspace{" + spacingString + r"}" + "\n\n")
@@ -326,19 +358,37 @@ def latex_to_pdf(latex_question_list, support_list, quiz_data):
     temp_path = os.path.join(
         script_path, r"..", tex_live_folder, "bin", os_folder, "pdftex"
     )
+    temp_path = os.path.join(
+        script_path, r"..", tex_live_folder, "bin", os_folder, "pdftex"
+    )
     pdflatex_path = os.path.abspath(temp_path)
 
     # Path to LaTeX file
     temp_path = os.path.join(script_path, r"..", "docs", "latex", "output_quiz.tex")
+    temp_path = os.path.join(script_path, r"..", "docs", "latex", "output_quiz.tex")
     latex_file_path = os.path.abspath(temp_path)
 
     # set current process running directory to latex folder
+    temp_path = os.path.join(script_path, "..", "docs", "latex")
     temp_path = os.path.join(script_path, "..", "docs", "latex")
     process_path = os.path.abspath(temp_path)
 
     os.chdir(process_path)
 
     # Run pdflatex command
+    try:
+        completed_process = subprocess.run(
+            [pdflatex_path, "-fmt", "pdflatex", latex_file_path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=TIMEOUT,
+        )
+        error = completed_process.stderr
+
+    except subprocess.TimeoutExpired:
+        print("Process terminated")
+        error = "Process timed out".encode("utf-8")
     try:
         completed_process = subprocess.run(
             [pdflatex_path, "-fmt", "pdflatex", latex_file_path],
@@ -379,10 +429,27 @@ def latex_to_pdf(latex_question_list, support_list, quiz_data):
     except subprocess.TimeoutExpired:
         print("Process terminated")
         error = "Process timed out".encode("utf-8")
+    try:
+        completed_process = subprocess.run(
+            [pdflatex_path, "-fmt", "pdflatex", latex_file_path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=TIMEOUT,
+        )
+        error = completed_process.stderr
+
+    except subprocess.TimeoutExpired:
+        print("Process terminated")
+        error = "Process timed out".encode("utf-8")
 
     if error:
         print("Error occurred:")
         print(error.decode("utf-8"))
+        for path in files_to_remove:
+            os.remove(path)
+        os.chdir(script_path)
+        raise ChildProcessError
         for path in files_to_remove:
             os.remove(path)
         os.chdir(script_path)
@@ -393,6 +460,14 @@ def latex_to_pdf(latex_question_list, support_list, quiz_data):
     rendering.quiz = quiz_data
     rendering.blob_key = blob
     rendering.save()
+    blob = save_pdf_blob(string_id)
+    rendering.quiz = quiz_data
+    rendering.blob_key = blob
+    rendering.save()
+
+    for path in files_to_remove:
+        os.remove(path)
+    os.chdir(script_path)
 
     for path in files_to_remove:
         os.remove(path)
@@ -405,8 +480,12 @@ def save_pdf_blob(string_id):
 
     temp_path = os.path.join(script_path, r"..", "docs", "latex")
     file_temp = os.path.join(temp_path, r"output_quiz.pdf")
+    temp_path = os.path.join(script_path, r"..", "docs", "latex")
+    file_temp = os.path.join(temp_path, r"output_quiz.pdf")
     file_path = os.path.abspath(file_temp)
 
+    new_name = string_id + ".pdf"
+    pdf_temp = os.path.join(temp_path, "..", "..", "media", "pdfs", new_name)
     new_name = string_id + ".pdf"
     pdf_temp = os.path.join(temp_path, "..", "..", "media", "pdfs", new_name)
     pdf_path = os.path.abspath(pdf_temp)
