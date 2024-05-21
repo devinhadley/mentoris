@@ -1,26 +1,13 @@
 import base64
 import json, os, random
-from datetime import date
-from django.http import HttpResponse, JsonResponse, HttpResponseForbidden
-from django.contrib import messages
-from django.contrib.auth import authenticate, login
-from django.contrib.auth.decorators import login_required
-from django.contrib.sites.shortcuts import get_current_site
-from django.core.files.base import ContentFile
-from django.core.files.storage import FileSystemStorage
-from django.core.mail import EmailMessage
-from django.shortcuts import render, get_object_or_404, redirect
+from django.http import HttpResponse, JsonResponse
 from django.template import loader
-from django.template.loader import render_to_string
+from django.core.files.storage import FileSystemStorage
+from django.core.files.storage import FileSystemStorage
 from django.urls import resolve
-from django.utils.encoding import force_bytes, force_str
-from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
-from functools import wraps
 from mentapp.models import (
-    Handle,
     Question_Attachment,
     Quiz_Rendering,
-    Site,
     User,
     Email,
     Volume,
@@ -40,66 +27,18 @@ from mentapp.models import (
     Support_Attachment,
     Quiz_Support,
 )
-from mentoris.email_verification_token_generator import email_verification_token
 from mentoris.forms import UserForm, LatexForm, QuizForm
+from django.shortcuts import render, get_object_or_404, redirect
+from django.contrib import messages
+from django.core.mail import send_mail
+from django.core.files.base import ContentFile
+from datetime import date
+
 from mentoris.latex_to_pdf import latex_to_pdf
 
 
 
-def mentor_req(view_func):
-    @wraps(view_func)
-    def _wrapped_view(request, *args, **kwargs):
-        # Checking that there is a logged in user else return to the login page
-        if not request.user.is_authenticated:
-            return render(request, "mentapp/login.html")
-        # Checking that user is mentor (verified) or higher else returning an error
-        if not (
-            request.user.is_quizmaker
-            or request.user.is_admin
-            or request.user.is_verified
-        ):
-            return HttpResponseForbidden(
-                "Forbidden: Must be mentor or quizmaker to access add questions page."
-            )
-        return view_func(request, *args, **kwargs)
-
-    return _wrapped_view
-
-
-def quizmaker_req(view_func):
-    @wraps(view_func)
-    def _wrapped_view(request, *args, **kwargs):
-        # Checking that there is a logged in user else return to the login page
-        if not request.user.is_authenticated:
-            return render(request, "mentapp/login.html")
-        # Checking user is quiz maker or higher else returning forbidden HTTP page.
-        if not (request.user.is_quizmaker or request.user.is_admin):
-            return HttpResponseForbidden(
-                "Forbidden: Must be quizmaker or admin to access edit quiz."
-            )
-        return view_func(request, *args, **kwargs)
-
-    return _wrapped_view
-
-
-def admin_req(view_func):
-    @wraps(view_func)
-    def _wrapped_view(request, *args, **kwargs):
-        # Checking that there is a logged in user else return to the login page
-        if not request.user.is_authenticated:
-            return redirect("admin:login")
-        # Must be admin!
-        if not request.user.is_admin:
-            return HttpResponseForbidden(
-                "Forbidden: Must be admin to access edit quiz."
-            )
-        return view_func(request, *args, **kwargs)
-
-    return _wrapped_view
-
-
-@mentor_req
-def latex(request):
+def latex(request, question_id):
     volumes = (
         Volume.objects.values_list("volume_id", flat=True)
         .distinct()
@@ -118,8 +57,13 @@ def latex(request):
     if request.method == "POST":
         if request.POST.get("command") == "deleteAttachment":
             question =  get_object_or_404(Question, question_id = question_id)
+            print("question found")
             question_loc = get_object_or_404(Question_Loc, question = question, lang_code = "ENG", dialect_code = "US")
+            print("LOC found")
             attachment = get_object_or_404(Question_Attachment, question = question_loc, filename = request.POST.get("filename"))
+            print("attachment found")
+            print(attachment.filename)
+            print("blob found")
             attachment.blob_key.delete()
             attachment.delete()
             return JsonResponse({"success": True})
@@ -146,8 +90,12 @@ def latex(request):
             return JsonResponse({"success": True})
 
         if request.POST.get("command") == "upload":
+            print("finding question...")
             question =  get_object_or_404(Question, question_id = question_id)
+            print("finding LOC...")
             question_loc = get_object_or_404(Question_Loc, question = question, lang_code = "ENG", dialect_code = "US")
+            print("found question loc")
+            print(request.FILES)
             for filename, file in request.FILES.items():
                 name = filename[0:filename.rfind(".")]
                 blob = Blob(file = file, content_type = file.content_type, filename= name)
@@ -155,6 +103,7 @@ def latex(request):
                 blob.save()
                 attachment.save()
             
+            print("Returning JSOn response....")
             return JsonResponse({"success": True, "url": blob.file.url, "name": name})
         form = LatexForm(request.POST)
         question = request.POST.get("latex_question")
@@ -172,8 +121,7 @@ def latex(request):
             question_object = Question()
             question_loc = Question_Loc()
 
-            question_object.creator = request.user
-            question_loc.creator = request.user
+            # TODO: question_object.creator = CURRENT USER
 
             chapter_object = request.POST.get("chapter")
             chapter_string = chapter_object.split("_")
@@ -191,7 +139,7 @@ def latex(request):
             question_loc.question_latex = question
             question_loc.answer_latex = answer
             question_loc.rubric_latex = grading
-
+            # TODO: question_loc.creator = CURRENT USER
             question_loc.save()
 
             question_attachments = request.FILES.getlist("attachments")
@@ -255,19 +203,11 @@ def latex(request):
         )
 
 
-def default(request):
-    if not request.user or hasattr(request, "user"):
-        return redirect(f"../login")
-    elif not request.user.is_verified:
-        return redirect(f"../profile/{request.user.user_id}")
-    else:
-        return redirect(f"../main")
-
-
 def sign_up(request):
     if request.method == "POST":
         # Add to User table
         form = UserForm(request.POST)
+
         if form.is_valid():
             email_exists = False
             other_email_exists = False
@@ -297,16 +237,7 @@ def sign_up(request):
                         "other_emails": request.POST.get("other_emails"),
                     },
                 )
-            user = form.save(commit=False)
-            user.email = request.POST.get("email_address")
-            user.is_active = True
-            user.save()
-
-            verification_object = Verification()
-            verification_object.verified = user
-            verification_object.verifier = user
-            verification_object.save()
-
+            user = form.save()
             # Add to Email table
             email = request.POST.get("email_address")
             emailObject = Email()
@@ -316,7 +247,6 @@ def sign_up(request):
             emailObject.save()
 
             other_emails = request.POST.get("other_emails")
-
             if other_emails is not None and other_emails != "":
                 email_list = other_emails.split(",")
                 for other_email in email_list:
@@ -326,25 +256,8 @@ def sign_up(request):
                     emailObject.is_primary = False
                     emailObject.save()
 
-            github = request.POST.get("github")
-            if github and github != "":
-                handleObject = Handle(
-                    user=user, site=Site.objects.get(site_id="github"), handle=github
-                )
-                handleObject.save()
+            return redirect(f"../profile/{user.user_id}")
 
-            x = request.POST.get("x")
-            if x and x != "":
-                handleObject = Handle(
-                    user=user, site=Site.objects.get(site_id="x"), handle=x
-                )
-                handleObject.save()
-
-            user = authenticate(
-                username=email, password=request.POST.get("password_hash")
-            )
-            login(request, user)
-            return redirect("verify_email")
         return render(
             request,
             "mentapp/sign_up.html",
@@ -361,63 +274,25 @@ def profile(request):
     return HttpResponse(template.render())
 
 
-def reset(request):
-    if request.method == "POST":
-        email_address = request.POST.get("email")
-        user = User.objects.get(email=email_address)
-        current_site = get_current_site(request)
-        subject = "Reset your password"
-        message = render_to_string(
-            "mentapp/reset_password_message.html",
-            {
-                "request": request,
-                "user": user,
-                "domain": current_site.domain,
-                "uid": urlsafe_base64_encode(force_bytes(user.pk)),
-                "token": email_verification_token.make_token(user),
-            },
-        )
-        email = EmailMessage(
-            subject, message, "notifications@kontinua.org", [email_address]
-        )
-        email.content_subtype = "html"
-        email.send()
-        return JsonResponse({"success": True})
-    return render(request, "mentapp/reset.html")
-
-
-def verify_reset(request, uidb64, token):
-    try:
-        uid = force_str(urlsafe_base64_decode(uidb64))
-        user = User.objects.get(pk=uid)
-    except (TypeError, ValueError, OverflowError, User.DoesNotExist):
-        user = None
-    if user and email_verification_token.check_token(user, token):
-        return redirect(f"/reset_password")
-    else:
-        messages.warning(request, "The link is invalid.")
-    return render(request, "mentapp/verify_email_confirm.html")
-
-
 def reset_password(request):
-    if request.method == "POST":
-        email = request.POST.get("email")
-        user = User.objects.get(email=email)
-        new_password = request.POST.get("new_password")
-        user.set_password(new_password)
-        user.save()
-        return JsonResponse({"success": True})
-    else:
-        return render(request, "mentapp/reset_password.html")
+    return render(request, "mentapp/reset_password.html")
 
 
-def customLogin(request):
+def login(request):
     if request.method == "POST":
         email = request.POST.get("email")
         password = request.POST.get("password")
-        user = authenticate(request, username=email, password=password)
+
+        try:
+            emailObject = Email.objects.get(email_address=email)
+            user = emailObject.user
+            if not user.check_password(password):
+                user = None
+        except Email.DoesNotExist:
+            user = None
+
         if user is not None:
-            login(request, user)
+            # TODO: log user in
             return redirect(f"../profile/{user.user_id}")
         else:
             messages.error(
@@ -433,7 +308,6 @@ def customLogin(request):
         return render(request, "mentapp/login.html")
 
 
-@mentor_req
 def main(request, volume_id=1):
     template = loader.get_template("mentapp/main.html")
 
@@ -487,7 +361,6 @@ def chapter(request, volume_id, chapter_id):
     )
 
 
-@mentor_req
 def quiz(request, volume_id, chapter_id, quiz_id):
     volume_id = get_object_or_404(Volume, volume_id=volume_id)
     chapter_id = get_object_or_404(Chapter, chapter_id=chapter_id)
@@ -496,18 +369,21 @@ def quiz(request, volume_id, chapter_id, quiz_id):
     if request.method == "POST":
         if request.POST.get("command") == "viewer_publish":
             feedback = Quiz_Feedback()
-            feedback.quiz = quiz_id
+            feedback.rendering_id = Quiz_Rendering.objects.get(quiz=quiz_id)
             feedback.creator_id = quiz_id.creator_id
-            feedback.viewer_id = request.user
-
+            feedback.viewer_id = (
+                quiz_id.creator_id
+            )  # change this later when we can log in a user
             feedback.challenge_rating = int(request.POST.get("challenge_rating"))
             feedback.time_rating = int(request.POST.get("time_rating"))
             feedback.viewer_comment = request.POST.get("viewer_comment")
+
             feedback.save()
             return JsonResponse({"success": True})
         elif request.POST.get("command") == "delete":
+            render_id = Quiz_Rendering.objects.get(quiz=quiz_id)
             feedback = Quiz_Feedback.objects.get(
-                quiz=quiz_id,
+                rendering_id=render_id,
                 feedback_id=request.POST.get("feedback_id"),
             )
             feedback.delete()
@@ -518,8 +394,9 @@ def quiz(request, volume_id, chapter_id, quiz_id):
 
         try:
             reviews = []
+            render_id = Quiz_Rendering.objects.get(quiz=quiz_id)
             review_objects = Quiz_Feedback.objects.filter(
-                quiz=quiz_id,
+                rendering_id=render_id,
                 date_completed__isnull=True,
             ).distinct()
 
@@ -532,9 +409,8 @@ def quiz(request, volume_id, chapter_id, quiz_id):
                 email = Email.objects.get(user=review.viewer_id, is_primary=True)
                 reviews.append([email, review])
 
-            if len(review_objects) > 1:
-                avg_rating = challenge_ratings / len(review_objects)
-                avg_time = time_ratings / len(review_objects)
+            avg_rating = challenge_ratings / len(review_objects)
+            avg_time = time_ratings / len(review_objects)
         except:
             reviews = []
 
@@ -566,15 +442,15 @@ def quiz(request, volume_id, chapter_id, quiz_id):
         )
 
 
-@quizmaker_req
 def quiz_maker_view(request, volume_id, chapter_id, quiz_id):
     volume_id = get_object_or_404(Volume, volume_id=volume_id)
     chapter_id = get_object_or_404(Chapter, chapter_id=chapter_id)
     quiz_id = get_object_or_404(Quiz, quiz_id=quiz_id)
 
     if request.method == "POST":
+        render_id = Quiz_Rendering.objects.get(quiz=quiz_id)
         feedback = Quiz_Feedback.objects.get(
-            quiz=quiz_id,
+            rendering_id=render_id,
             feedback_id=request.POST.get("feedback_id"),
         )
         if request.POST.get("command") == "resolve":
@@ -592,8 +468,9 @@ def quiz_maker_view(request, volume_id, chapter_id, quiz_id):
 
         try:
             reviews = []
+            render_id = Quiz_Rendering.objects.get(quiz=quiz_id)
             review_objects = Quiz_Feedback.objects.filter(
-                quiz=quiz_id,
+                rendering_id=render_id,
                 date_completed__isnull=True,
             ).distinct()
 
@@ -629,51 +506,12 @@ def quiz_maker_view(request, volume_id, chapter_id, quiz_id):
         )
 
 
-@quizmaker_req
-def question_approval(request):
-    if request.method == "POST":
-        question = Question.objects.get(
-            question_id=request.POST.get("question_id"),
-        )
-        question.approval_requested = False
-        if request.POST.get("command") == "accept":
-            question.approved = True
-            question_loc = Question_Loc.objects.get(question=question)
-            question_loc.date_approved = date.today()
-            question_loc.approver = request.user
-            question_loc.save()
-        question.save()
-        return JsonResponse({"success": True})
-
-    try:
-        question_locs = Question_Loc.objects.order_by("date_created")
-        question_info = []
-
-        for question_loc in question_locs:
-            question = question_loc.question
-            if question.approval_requested and not question.approved:
-                question_info = [question, question_loc]
-                break
-
-        chapter_loc = Chapter_Loc.objects.get(chapter=question.chapter)
-        question_info.append(chapter_loc)
-    except:
-        question_info = []
-
-    return render(
-        request,
-        "mentapp/question_approval.html",
-        {"question": question_info},
-    )
-
-
-@admin_req
 def promotion(request):
     if request.method == "POST":
         email_object = Email.objects.get(
             email_address=request.POST.get("email"), is_primary=True
         )
-        user = email_object.user
+        user = get_object_or_404(User, user_id=email_object.user_id)
 
         if request.POST.get("command") == "promote":
             if user.is_active == True:
@@ -686,10 +524,6 @@ def promotion(request):
 
         user.promotion_requested = False
         user.save()
-
-        verification_object = Verification.objects.get(verified=user)
-        verification_object.verifier = request.user
-        verification_object.save()
         return JsonResponse({"success": True})
     else:
         return render(
@@ -703,13 +537,12 @@ def promotion(request):
         )
 
 
-@admin_req
 def user_directory(request):
     if request.method == "POST":
         email_object = Email.objects.get(
             email_address=request.POST.get("email"), is_primary=True
         )
-        user = email_object.user
+        user = get_object_or_404(User, user_id=email_object.user_id)
         status = "Newbie"
         color = "btn btn-outline-secondary"
 
@@ -729,11 +562,6 @@ def user_directory(request):
             user.is_active = False
 
         user.save()
-
-        verification_object = Verification.objects.get(verified=user)
-        verification_object.verifier = request.user
-        verification_object.save()
-
         return JsonResponse({"success": True, "status": status, "color": color})
     else:
         return render(
@@ -771,78 +599,41 @@ def grab_users(verified, quiz_maker, admin, active, get_promotion):
 def grab_verification_info(user_ids):
     verification_info = []
     for user_id in user_ids:
-        user = User.objects.get(user_id=user_id)
-        email = Email.objects.get(user=user, is_primary=True)
+        email = Email.objects.get(user_id=user_id, is_primary=True)
         try:
-            verifications = Verification.objects.get(verified=user)
-
-            if verifications.verifier != verifications.verified:
-                verifier_email = Email.objects.get(
-                    user=verifications.verifier, is_primary=True
-                )
-                verification_info.append(
-                    (
-                        user_id,
-                        email.email_address,
-                        verifications.verifier.full_name,
-                        verifier_email.email_address,
-                    )
-                )
-            else:
-                verification_info.append(
-                    (
-                        user_id,
-                        email.email_address,
-                        "",
-                        "",
-                    )
-                )
+            verifications = Verification.objects.exclude(date_granted__isnull=True).get(
+                verified=user_id
+            )
+            verifier_id = verifications.verifier.user_id
+            verifier = get_object_or_404(User, user_id=verifier_id)
+            verifier_email = Email.objects.get(user_id=verifier_id, is_primary=True)
         except Verification.DoesNotExist:
-            verification_info.append((user_id, email.email_address))
+            verifier = None
+
+        verification_info.append(
+            (
+                user_id,
+                email.email_address,
+                verifier.full_name,
+                verifier_email.email_address,
+            )
+        )
     return verification_info
 
 
-@login_required
 def user_info(request, user_id):
-    user = request.user
-    if request.method == "POST":
-        user.promotion_requested = True
-        user.save()
-
-        verification_object = Verification.objects.get(verified=user)
-        verification_object.date_requested = date.today()
-        verification_object.save()
-        return JsonResponse({"success": True})
-
-    if user_id != user.user_id and user.is_admin != True:
-        return render(request, "mentapp/login.html")
     user_profile = get_object_or_404(User, user_id=user_id)
-    if user_profile.is_admin == True:
-        return HttpResponseForbidden("Forbidden: Admin's use admin portal")
-
     try:
-        email = Email.objects.get(user=user_profile, is_primary=True)
-        other_emails = Email.objects.filter(user=user_profile, is_primary=False)
+        email = Email.objects.get(user_id=user_id, is_primary=True)
+        other_emails = Email.objects.filter(user_id=user_id, is_primary=False)
         other_emailss = [obj.email_address for obj in other_emails]
         other_email = ", ".join(other_emailss)
     except Email.DoesNotExist:
         email = None
-    handles = Handle.objects.filter(user=user_profile)
-    request_btn = "Request Authorization"
-
-    if user.is_verified:
-        request_btn = "Request Promotion"
-
     return render(
         request,
         "mentapp/profile.html",
-        {
-            "user_profile": user_profile,
-            "email": email,
-            "other_email": other_email,
-            "handles": handles,
-            "request_btn": request_btn,
-        },
+        {"user_profile": user_profile, "email": email, "other_email": other_email},
     )
 
 
@@ -893,8 +684,6 @@ def grab_quiz_questions_data_table(quiz_questions):
     return questionTable
 
 
-@login_required
-@quizmaker_req
 def edit_quiz(request, quiz_id):
     quiz_instance = get_object_or_404(Quiz, quiz_id=quiz_id)
     quiz_questions = (
@@ -902,12 +691,6 @@ def edit_quiz(request, quiz_id):
         .filter(quiz=quiz_instance.quiz_id)
         .order_by("ordering")
     )
-    quiz_supports = (
-        Quiz_Support.objects.all()
-        .filter(quiz=quiz_instance.quiz_id)
-        .order_by("ordering")
-    )
-
     if request.method == "POST":
         if request.POST.get("command") == "save":
             print(request.POST.get("ids"))
@@ -928,18 +711,10 @@ def edit_quiz(request, quiz_id):
                         print("looping...")
             print("exit loop...")
             quiz_instance.label = request.POST.get("label")
-            quiz_instance.conceptual_difficulty = float(
-                request.POST.get("conceptual_difficulty")
-            )
-            quiz_instance.time_required_mins = int(
-                request.POST.get("time_required_mins")
-            )
-            quiz_instance.volume = get_object_or_404(
-                Volume, volume_id=request.POST.get("volume")
-            )
-            quiz_instance.chapter = get_object_or_404(
-                Chapter, chapter_id=request.POST.get("chapter")
-            )
+            quiz_instance.conceptual_difficulty = float(request.POST.get("conceptual_difficulty"))
+            quiz_instance.time_required_mins = int(request.POST.get("time_required_mins"))
+            quiz_instance.volume = get_object_or_404(Volume, volume_id = request.POST.get("volume"))    
+            quiz_instance.chapter = get_object_or_404(Chapter, chapter_id = request.POST.get("chapter"))
             calculator_allowed_str = request.POST.get("calculator_allowed")
             computer_allowed_str = request.POST.get("computer_allowed")
             internet_allowed_str = request.POST.get("internet_allowed")
@@ -1134,6 +909,8 @@ def edit_quiz_add_support(request, quiz_id):
 
             support_values = dict()
             support_values["support_id"] = support.support_id
+            print("Upport I")
+            print(support.support_id)
 
 
             if support.support.volume_id.volume_id is not None:
@@ -1187,14 +964,16 @@ def user_edit(request, user_id):
 
     for key, value in request.POST.items():
         if key == "primary_email":
-            Email.objects.filter(user=user, is_primary=True).update(email_address=value)
+            Email.objects.filter(user_id=user_id, is_primary=True).update(
+                email_address=value
+            )
         if key == "other_emails":
-            Email.objects.filter(user=user, is_primary=False).delete()
+            Email.objects.filter(user_id=user_id, is_primary=False).delete()
             insEmails = value.split(",")
             for em in insEmails:
                 emailObject = Email()
                 emailObject.email_address = em
-                emailObject.user = user
+                emailObject.user_id = user_id
                 emailObject.save()
         # Check if the user object has this field and the value is not empty
         if hasattr(user, key) and value.strip():
@@ -1203,70 +982,22 @@ def user_edit(request, user_id):
     return redirect(f"/profile/{user.user_id}")
 
 
-def verify_email(request):
-    if request.method == "POST":
-        email_address = request.user.email
-        email_object = Email.objects.get(email_address=email_address)
-
-        if not email_object.is_verified:
-            current_site = get_current_site(request)
-            user = request.user
-            subject = "Verify Email"
-            message = render_to_string(
-                "mentapp/verify_email_message.html",
-                {
-                    "request": request,
-                    "user": user,
-                    "domain": current_site.domain,
-                    "uid": urlsafe_base64_encode(force_bytes(user.pk)),
-                    "token": email_verification_token.make_token(user),
-                },
-            )
-            email = EmailMessage(
-                subject, message, "notifications@kontinua.org", [email_address]
-            )
-            email.content_subtype = "html"
-            email.send()
-            return JsonResponse({"success": True})
-        else:
-            return redirect("signUp")
-    return render(request, "mentapp/verify_email.html")
-
-
-def verify_email_confirm(request, uidb64, token):
-    try:
-        uid = force_str(urlsafe_base64_decode(uidb64))
-        user = User.objects.get(pk=uid)
-    except (TypeError, ValueError, OverflowError, User.DoesNotExist):
-        user = None
-    if user and email_verification_token.check_token(user, token):
-        email = request.user.email
-        email_object = Email.objects.get(email_address=email)
-        email_object.is_verified = True
-        email_object.save()
-        messages.success(request, "Your email has been verified.")
-        return redirect(f"/profile/{user.user_id}")
-    else:
-        messages.warning(request, "The link is invalid.")
-    return render(request, "mentapp/verify_email_confirm.html")
-
-
-# def request_translation(request, user_id):
-#     # need to verify email to ses when they sign up in order for this to work
-#     email = get_object_or_404(Email, user_id=user_id, is_primary=True)
-#     primary_language = get_object_or_404(User.primary_language, user_id=user_id)
-#     send_mail(
-#         "Kontinua Quiz Questions Translations Request",
-#         "Hi there! We have noticed you are fluent in "
-#         + primary_language
-#         + ". This week these questions were added in "
-#         + primary_language
-#         + ". I can do a preliminary translation to "
-#         + primary_language
-#         + " using Google Translate. Would you look at and correct those preliminary translations?  Click here.",
-#         "notifications@kontinua.org",
-#         [email],
-#     )
+def request_translation(request, user_id):
+    # need to verify email to ses when they sign up in order for this to work
+    email = get_object_or_404(Email, user_id=user_id, is_primary=True)
+    primary_language = get_object_or_404(User.primary_language, user_id=user_id)
+    send_mail(
+        "Kontinua Quiz Questions Translations Request",
+        "Hi there! We have noticed you are fluent in "
+        + primary_language
+        + ". This week these questions were added in "
+        + primary_language
+        + ". I can do a preliminary translation to "
+        + primary_language
+        + " using Google Translate. Would you look at and correct those preliminary translations?  Click here.",
+        "notifications@kontinua.org",
+        [email],
+    )
 
 
 def download_pdf(request, quiz_id):
@@ -1303,7 +1034,6 @@ def upload_pdf(request, pdf_path):
         return JsonResponse({"status": "error", "message": str(e)})
 
 
-@quizmaker_req
 def create_quiz(request, volume_id, chapter_id):
     if request.method == "POST":
         # Create a new Quiz instance
@@ -1316,7 +1046,6 @@ def create_quiz(request, volume_id, chapter_id):
             book_allowed=False,
             volume_id=volume_id,
             chapter_id=chapter_id,
-            creator_id=request.user,
         )
 
         # Redirect to the edit page for the new quiz
@@ -1333,38 +1062,16 @@ def delete_quiz(request, quiz_id):
     return redirect(request.META.get("HTTP_REFERER", "/"))
 
 
-def create_support(request, quiz_id):
+def create_support(request):
 
-    if request.method == "POST":
-
-        support = Support.objects.create(volume_id=Volume.objects.first())
-        support_loc = Support_Loc.objects.create(support=support, title_latex="")
-
-        return redirect(f"/edit_support/{quiz_id}/{support.support_id}")
-
-    return render(request, "mentapp/main.html")
-
-
-def edit_support(request, quiz_id, support_id):
-    support_object = get_object_or_404(Support, support_id=support_id)
     volumes = (
         Volume.objects.values_list("volume_id", flat=True)
         .distinct()
         .order_by("volume_id")
     )
-    support_loc = get_object_or_404(Support_Loc, support=support_object)
+    creators = User.objects.values_list("user_id")
 
-    content = support_loc.content_latex
-    title = support_loc.title_latex
-    volume_id = support_object.volume_id
-
-    form = LatexForm(
-        initial={
-            "latex_support": content,
-            "title": title,
-            "volume": volume_id,
-        }
-    )
+    volume_id = 1
 
     if request.method == "POST":
         form = LatexForm(request.POST, request.FILES)
@@ -1387,9 +1094,6 @@ def edit_support(request, quiz_id, support_id):
                 approver_id=creators.first()[0],
             )
 
-            support_loc.title_latex = support_title
-            support_loc.content_latex = support_content
-            support_loc.creator = (request.user,)
             support_loc.save()
 
             for attachment in support_attachments:
@@ -1409,35 +1113,28 @@ def edit_support(request, quiz_id, support_id):
                 )
                 support_attachment_instance.save()
 
-            return redirect(f"/edit_quiz_add_support/{quiz_id}")
+            return redirect("main")
 
         return render(
             request,
-            "mentapp/edit_support.html",
+            "mentapp/create_support.html",
             {
-                "quiz_id": quiz_id,
                 "form": form,
                 "volumes": volumes,
                 "volume_id": volume_id,
                 "support_content": support_content,
-                "support_id": support_id,
             },
         )
-
-    return render(
-        request,
-        "mentapp/edit_support.html",
-        {
-            "quiz_id": quiz_id,
-            "form": form,
-            "volumes": volumes,
-            "support_id": support_id,
-        },
-    )
-
+    else:
+        return render(
+            request,
+            "mentapp/create_support.html",
+            {"form": LatexForm(), "volumes": volumes},
+        )
+    
 
 def create_question(request):
-
+    
     volumes = (
         Volume.objects.values_list("volume_id", flat=True)
         .distinct()
@@ -1452,14 +1149,16 @@ def create_question(request):
     ).distinct()
 
     chapter_object = chapter_locs[0]
-    if request.method == "POST":
+    if request.method == 'POST':
 
-        question = Question.objects.create(chapter=chapters[0])
-        question_loc = Question_Loc.objects.create(question=question)
+        question = Question.objects.create(chapter = chapters[0])
+        question_loc = Question_Loc.objects.create(
+            question=question)
 
         return redirect(f"/edit_question/{question.question_id}")
 
-    return render(request, "mentapp/main.html")
+
+    return render(request, 'mentapp/main.html')
 
 def grab_attachments_question(question_id):
     question =  get_object_or_404(Question, question_id = question_id)
@@ -1505,6 +1204,8 @@ def grab_attachments_support(support_id):
         attachmentDict["filename"] = attachment.filename
         attachmentDict["url"] = attachment.blob_key.file.url
         attachmentsList.append(attachmentDict)
+        print("oun omething!")
+        print(attachment.filename)
 
     return attachmentsList
 
@@ -1515,9 +1216,12 @@ def fetch_attachments_support(request, support_id):
 
 # Returns a JSON response with the attachment files and names and the LaTeX
 def fetch_attachments_inputs_support(request, support_id):
+    print("attempt!")
+    print(support_id)
     support =  get_object_or_404(Support, support_id = support_id)
     support_Loc = get_object_or_404(Support_Loc, support = support, lang_code="ENG", dialect_code="US")
     input = support_Loc.content_latex
+    print(input)
     attachmentsList = grab_attachments_support(support_id)
     return JsonResponse({"attachments": attachmentsList, "input" : input})
     
@@ -1568,7 +1272,6 @@ def edit_question(request, question_id):
         'pages_required': question_object.pages_required,
     }
 )
-
     chapters = Chapter.objects.filter(volume__volume_id=volume_id).distinct()
 
     chapter_locs = Chapter_Loc.objects.filter(
@@ -1711,4 +1414,5 @@ def edit_question(request, question_id):
                 "volume_id": volume_id,
                 "chapters": chapter_locs,
                 "chapter": chapter_object,
-        )
+            },
+    )
