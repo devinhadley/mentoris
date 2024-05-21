@@ -910,7 +910,7 @@ def edit_quiz(request, quiz_id):
 
     if request.method == "POST":
         if request.POST.get("command") == "save":
-            # TODO: Ids are just the questions, update edit_quiz.html to include supports
+            print(request.POST.get("ids"))
             ids_str = json.loads(request.POST.get("ids"))
             ids = list()
             for id_str in ids_str:
@@ -925,6 +925,8 @@ def edit_quiz(request, quiz_id):
                     if quiz_question.question.question_id == id:
                         quiz_question.ordering = count
                         quiz_question.save()
+                        print("looping...")
+            print("exit loop...")
             quiz_instance.label = request.POST.get("label")
             quiz_instance.conceptual_difficulty = float(
                 request.POST.get("conceptual_difficulty")
@@ -965,8 +967,7 @@ def edit_quiz(request, quiz_id):
 
             quiz_instance.save()
             question_list = []
-            support_list = []
-
+            print("entering secondd oop")
             for id in ids:
                 for quiz_question in quiz_questions:
                     if quiz_question.question.question_id == id:
@@ -975,15 +976,12 @@ def edit_quiz(request, quiz_id):
                             Question_Loc, question=question_meta
                         )
                         question_list.append(question_content)
-                for quiz_support in quiz_supports:
-                    if quiz_support.support.support_id == id:
-                        support_meta = quiz_support.support
-                        support_content = get_object_or_404(
-                            Support_Loc, support=support_meta
-                        )
-                        support_list.append(support_content)
-
-            latex_to_pdf(question_list, support_list, quiz_instance)
+                        print("secondd looping")
+            print("exit second loop")
+            print(question_list)
+            print(quiz_instance)
+            latex_to_pdf(question_list, [], quiz_instance)
+            print("return")
             return JsonResponse({"success": True})
     else:
         if request.GET.get("command") == "fetch_quiz_questions":
@@ -1619,7 +1617,8 @@ def edit_question(request, question_id):
             if request.POST.get("command") == "upload":
                 for filename, file in request.FILES.items():
                     # remove file extension from name
-                    name = filename[0:filename.rfind(".")]
+                    # name = filename[0:filename.rfind(".")]
+                    name = filename
                     blob = Blob(file = file, content_type = file.content_type, filename= name)
                     attachment = Question_Attachment(question = question_loc, blob_key = blob, filename = name)
                     blob.save()
@@ -1628,7 +1627,6 @@ def edit_question(request, question_id):
                 return JsonResponse({"success": True, "url": blob.file.url, "name": name})
             
             if "submit-question" in request.POST:
-
                 chapter_object = request.POST.get("chapter")
                 chapter_string = chapter_object.split("_")
                 chapter_title = chapter_string[0]
@@ -1713,5 +1711,4 @@ def edit_question(request, question_id):
                 "volume_id": volume_id,
                 "chapters": chapter_locs,
                 "chapter": chapter_object,
-            },
         )

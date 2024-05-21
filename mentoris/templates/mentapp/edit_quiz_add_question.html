@@ -52,12 +52,6 @@
                 color: white;
             }
 
-            #quiz_content {
-                width: 35em;
-                padding: 10px;
-                margin-bottom: 0px;
-            }
-
         </style>
 
     </head>
@@ -68,14 +62,16 @@
         <!--Include Header-->
         <iframe src="header.html" width="100%" height="95px" frameBorder="0" style="display: block; padding: 0px; margin: 0px;"></iframe>
         
-        <div id="left_panel">
-        <button id="back_button" onclick="confirmLeave()" type="button">Back</button>
-        <div id = "quiz_content" class ="bordered">
-            <ul id = "questions_list" style="list-style-type:none;">
-            </ul>
-        </div>
-    </div>
-    
+    <ul class="unbulleted_list">
+        <li>
+            <button id="back_button" onclick="confirmLeave()" type="button">Back</button>
+        </li>
+        <li>
+            <div id = "quiz_content" class ="bordered">
+                <ul id = "questions_list" class="unbulleted_list"> </ul>
+            </div>
+        </li>
+    </ul>
     <!--Div for filters-->
     <div id = "right_panel">
         <div class="bordered" id = "meta_data">

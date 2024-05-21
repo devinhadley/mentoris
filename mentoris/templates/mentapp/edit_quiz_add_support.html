@@ -44,26 +44,6 @@
         .add_support_do_not_add_state {
             background: var(--KontinuaRed);
         }
-
-        .edit_question {
-                border: 2px solid Black;
-                border-radius: 25px;
-                margin: 5px;
-                width: 8em;
-                height: 2em;
-                font-weight: bold;
-            }
-
-            .edit_question:hover{
-                background-color: var(--KontinuaBlue);
-                color: white;
-            }
-
-        #quiz_content {
-            width: 35em;
-            padding: 10px;
-            margin-bottom: 0px;
-        }
     </style>
 </head>
 
@@ -74,16 +54,17 @@
     <iframe src="header.html" width="100%" height="95px" frameBorder="0"
         style="display: block; padding: 0px; margin: 0px;"></iframe>
 
-    <div id="left_panel">
-        <button id="back_button" onclick="confirmLeave()" type="button">Back</button>
-        <div id="quiz_content" class="bordered">
-            <ul id="supports_list" style="list-style-type:none;">
-            </ul>
-        </div>
-    </div>
+    <ul class="unbulleted_list">
+        <li><button id="back_button" onclick="confirmLeave()" type="button">Back</button></li>
+        <li>
+            <div id="quiz_content" class="bordered">
+                <ul id="supports_list"  class="unbulleted_list"></ul>
+            </div>
+        </li>
+    </ul>
 
-    <!--Div for filters-->
-    <div id="right_panel" style="width: 25em;">
+    <!--Div for filters -->
+    <div id="right_panel">
         <div class="bordered" id="meta_data">
             <div>
                 <div class="filter_wrapper">
@@ -173,7 +154,6 @@
 
 
         $(document).ready(function () {
-
             $('.add_support_button').on('click', function (event) {
                 toggle_add(this);
             });
@@ -199,10 +179,19 @@
                     });
                 
                 request.done(function (data) {
-                    document.getElementById("supports_list").innerHTML = "";
+                    support_list = document.getElementById("supports_list");
+                    support_list.innerHTML = "";
+                    
+
+                    /**
+                    * TODO extract this code into a .js file, a lot of this will be needed on the edit support page
+                    */
                     for (const i in data) {
+                        console.log("thi i the t");
+                        console.log(data);
                         var list_item = document.createElement("li");
                         list_item.id = data[i]["support_id"];
+                        console.log(data[i]["support_id"]);
 
                         var border_wrapper = document.createElement("div");
                         $(border_wrapper).addClass("bordered");
@@ -270,17 +259,21 @@
                         button_wrapper.appendChild(ul);
                         
                         border_wrapper.appendChild(button_wrapper);
-
-                        //var latex_wrapper =  generate_latex(data[i]["support_latex"], data[i]["attachment_urls"]);
                         
-                        document.createElement("div");
-                        //latex_wrapper.style.clear = "both";
-
-                        var latex = document.createElement("latex-js");
-
-                        //border_wrapper.appendChild(latex_wrapper);
-                        list_item.appendChild(border_wrapper);
-                        document.getElementById("supports_list").appendChild(list_item);
+                        let latex_wrapper = document.createElement("iframe");
+                        latex_wrapper.src = "/latex_window/support/" + data[i]["support_id"] + "/"+ widthHTMLElement(border_wrapper) + "/" ;
+                        border_wrapper.appendChild(latex_wrapper);
+                
+                        support_list.appendChild(border_wrapper);
+                        border_wrapper.appendChild(list_item);
+                        initLatexFrame(latex_wrapper);
+                        latex_wrapper.contentWindow.addEventListener(
+                            "message",
+                            (event) => {
+                                border_wrapper.style.height= (200 + latex_wrapper.contentDocument.body.scrollHeight) + "px";
+                            },
+                            false,
+                          );
                     }
                 });
 
@@ -350,6 +343,7 @@
             const modal = document.getElementById('customModal');
             modal.style.display = 'none';
         }
+
     </script>
 
 </body>
