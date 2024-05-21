@@ -1,13 +1,14 @@
 <!DOCTYPE html>
 <html>
     <head>
-        <style></style>
         <!--THE WINDOW-->
         {% load static %}
         <script src= "{% static "/scripts/generate_quiz_html.js" %}"></script>
         <script src="https://cdn.jsdelivr.net/npm/latex.js/dist/latex.js"></script>
         <!--Include AJAX-->
         <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.0/jquery.min.js"></script>
+        <style>
+        </style>
     </head>
     <body>
     
@@ -54,6 +55,9 @@
                 }});
 
                 rs.observe(document.body);
+                document.body.addEventListener("resize", ()=> {
+                    window.postMessage("message");
+                });
         });
     }
 

@@ -10,7 +10,10 @@ from mentapp.models import (
     Quiz_Rendering,
     Blob,
     Question_Attachment,
+    Support_Attachment,
 )
+
+TIMEOUT = 10  # try to render the PDF for 10 seconds before failing
 
 
 def generateRandomString(hashId):
@@ -43,16 +46,16 @@ def getChapterNum(volume, chapter):
             chapterNum = i
             break
     if chapterNum != -1:
-        return "(" + str(chapterNum) + "/" + str(numChapters) + ")"
+        return "(" + str(chapterNum + 1) + "/" + str(numChapters) + ")"
     else:
         print("Error: chapter not found")
         return "(X/X)"
 
 
 # Converts page size to vspace
-def pagesRequiredToSpacing(pages):
-    centimeters = round(pages * 29.7, 2)
-    return str(centimeters) + "cm"
+def pagesRequiredToSpacing(pages, answer_length=0):
+    em = pages * 50 - answer_length
+    return str(em) + "em"
 
 
 """
@@ -63,9 +66,9 @@ quiz_data: quiz object
 """
 
 
-def latex_to_pdf(latex_question_list, quiz_data):
+def latex_to_pdf(latex_question_list, support_list, quiz_data):
     script_path = os.path.dirname(__file__)
-    file_location = os.path.join(script_path, r"..\docs\latex\output_quiz.tex")
+    file_location = os.path.join(script_path, "..", "docs", "latex", "output_quiz.tex")
     abs_file_location = os.path.abspath(file_location)
     output_file = open(abs_file_location, "w")
     output_file.write(r"\documentclass[letterpaper,12pt,addpoints]{exam}" + "\n")
@@ -82,7 +85,7 @@ def latex_to_pdf(latex_question_list, quiz_data):
     output_file.write(r"\firstpageheader{}{}{}" + "\n")
 
     rendering = Quiz_Rendering()
-   
+
     recent_id = 0
     try:
         recent_id = Quiz_Rendering.objects.latest("date_created").rendering_id
@@ -173,113 +176,239 @@ def latex_to_pdf(latex_question_list, quiz_data):
     output_file.write(r"}" + "\n")
     output_file.write(r"} %Ends helvetica" + "\n")
 
-    # TODO: Supports here
+    files_to_remove = []
 
-    output_file.write(r"\begin{enumerate}" + "\n\n")
-    # output_file.write(r"\clearpage" + "\n")
-    output_file.write(r"\vspace{0.25cm}" + "\n")
+    for support_loc in support_list:
+        support_latex = support_loc.content_latex
+        output_file.write(support_latex + "\n\n")
 
-    for question_loc in latex_question_list:
-        latex_question = question_loc.question_latex
-        point = int(question_loc.question.point_value)
-        plural = "" if point == 1 else "s"
-        output_file.write(
-            r"\item ("
-            + str(point)
-            + r" point"
-            + plural
-            + r") "
-            + latex_question
-            + "\n\n"
-        )
-
-        attachment_list = Question_Attachment.objects.filter(question=question_loc)
+        attachment_list = Support_Attachment.objects.filter(support=support_loc)
         for attachment in attachment_list:
             blob = attachment.blob_key
-            temp_path = os.path.join(script_path, r"..\media", str(blob.file))
+            temp_path = os.path.join(script_path, "..", "media", str(blob.file))
             blob_path = os.path.abspath(temp_path)
 
-            final_path = os.path.join(script_path, blob.filename)
+            final_path = os.path.join(script_path, "..", "docs", "latex", blob.filename)
 
             shutil.copy(blob_path, final_path)
 
             output_file.write(r"\vspace{0.2cm}" + "\n")
             output_file.write(r"\begin{center}" + "\n")
+
+            # removes file extension from  file_name
+            dotIndex = blob.filename[::-1].find(".")
+            blob_filename = blob.filename[: -1 * dotIndex - 1]
+
             output_file.write(
-                r"\includegraphics[width=2cm]{" + blob.filename + r"}" + "\n"
+                r"\includegraphics[width=2cm]{" + blob_filename + r"}" + "\n"
             )
             output_file.write(r"\end{center}" + "\n")
 
-            os.remove(final_path)
+            files_to_remove.append(final_path)
 
-        pages_required = question_loc.question.pages_required
-        spacingString = pagesRequiredToSpacing(pages_required)
-        output_file.write(r"\vspace{" + spacingString + r"}" + "\n\n")
+    if len(latex_question_list) > 0:  # Checks if quiz is empty
+        output_file.write(r"\begin{enumerate}" + "\n\n")
+        output_file.write(r"\vspace{0.25cm}" + "\n")
 
-    output_file.write(r"\end{enumerate}" + "\n")
+        for question_loc in latex_question_list:
+            latex_question = question_loc.question_latex
+            point = int(question_loc.question.point_value)
+            plural = "" if point == 1 else "s"
+            output_file.write(
+                r"\item ("
+                + str(point)
+                + r" point"
+                + plural
+                + r") "
+                + latex_question
+                + "\n\n"
+            )
+
+            attachment_list = Question_Attachment.objects.filter(question=question_loc)
+            for attachment in attachment_list:
+                blob = attachment.blob_key
+                temp_path = os.path.join(script_path, "..", "media", str(blob.file))
+                blob_path = os.path.abspath(temp_path)
+
+                final_path = os.path.join(
+                    script_path, "..", "docs", "latex", blob.filename
+                )
+
+                shutil.copy(blob_path, final_path)
+
+                output_file.write(r"\vspace{0.2cm}" + "\n")
+                output_file.write(r"\begin{center}" + "\n")
+
+                # removes file extension from  file_name
+                dotIndex = blob.filename[::-1].find(".")
+                blob_filename = blob.filename[: -1 * dotIndex - 1]
+
+                output_file.write(
+                    r"\includegraphics[width=2cm]{" + blob_filename + r"}" + "\n"
+                )
+                output_file.write(r"\end{center}" + "\n")
+
+                files_to_remove.append(final_path)
+
+            pages_required = question_loc.question.pages_required
+            spacingString = pagesRequiredToSpacing(pages_required)
+            output_file.write(r"\vspace{" + spacingString + r"}" + "\n\n")
+
+        output_file.write(r"\end{enumerate}" + "\n")
+
+    # Answer Key
+    if len(latex_question_list) > 0:  # Checks if quiz is empty
+        output_file.write(r"\newpage")
+        output_file.write(r"\setcounter{page}{1}")
+        output_file.write(r"\begin{center}")
+        output_file.write(r"\LARGE Answer Key")
+        output_file.write(r"\vspace{0.5em}")
+        output_file.write(r"\end{center}")
+        output_file.write(r"\begin{enumerate}" + "\n\n")
+        output_file.write(r"\vspace{0.25cm}" + "\n")
+
+        for question_loc in latex_question_list:
+            latex_question = question_loc.question_latex
+            point = int(question_loc.question.point_value)
+            plural = "" if point == 1 else "s"
+            output_file.write(
+                r"\item ("
+                + str(point)
+                + r" point"
+                + plural
+                + r") "
+                + latex_question
+                + "\n\n"
+            )
+
+            attachment_list = Question_Attachment.objects.filter(question=question_loc)
+            for attachment in attachment_list:
+                blob = attachment.blob_key
+
+                shutil.copy(blob_path, final_path)
+
+                output_file.write(r"\vspace{0.2cm}" + "\n")
+                output_file.write(r"\begin{center}" + "\n")
+
+                # removes file extension from  file_name
+                dotIndex = blob.filename[::-1].find(".")
+                blob_filename = blob.filename[: -1 * dotIndex - 1]
+
+                output_file.write(
+                    r"\includegraphics[width=2cm]{" + blob_filename + r"}" + "\n"
+                )
+                output_file.write(r"\end{center}" + "\n")
+
+            answer_latex = question_loc.answer_latex
+            output_file.write(r"\color{red}")
+            output_file.write(answer_latex + "\n\n")
+            output_file.write(r"\color{black}")
+            answer_length = str(answer_latex).count("\n") + 1
+
+            pages_required = question_loc.question.pages_required
+            spacingString = pagesRequiredToSpacing(pages_required, answer_length)
+            output_file.write(r"\vspace{" + spacingString + r"}" + "\n\n")
+
+        output_file.write(r"\end{enumerate}" + "\n")
+
     output_file.write(r"\end{document}" + "\n")
 
     output_file.close()
 
-    success_flag = 0  # will be set to 2 if both generations succeed
+    if str(os.name) == "posix":
+        tex_live_folder = "tex-live-linux"
+        os_folder = "x86_64-linux"
+    else:
+        tex_live_folder = "tex-live"
+        os_folder = "windows"
 
     # Path to pdflatex command
-    temp_path = os.path.join(script_path, r"..\tex-live\bin\windows\pdflatex")
+    temp_path = os.path.join(
+        script_path, r"..", tex_live_folder, "bin", os_folder, "pdftex"
+    )
     pdflatex_path = os.path.abspath(temp_path)
 
     # Path to LaTeX file
-    temp_path = os.path.join(script_path, r"..\docs\latex\output_quiz.tex")
+    temp_path = os.path.join(script_path, r"..", "docs", "latex", "output_quiz.tex")
     latex_file_path = os.path.abspath(temp_path)
 
     # set current process running directory to latex folder
-    temp_path = os.path.join(script_path, "..\docs\latex")
+    temp_path = os.path.join(script_path, "..", "docs", "latex")
     process_path = os.path.abspath(temp_path)
 
     os.chdir(process_path)
 
     # Run pdflatex command
-    process = subprocess.Popen(
-        [pdflatex_path, latex_file_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE
-    )
+    try:
+        completed_process = subprocess.run(
+            [pdflatex_path, "-fmt", "pdflatex", latex_file_path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=TIMEOUT,
+        )
+        error = completed_process.stderr
 
-    output, error = process.communicate()
+    except subprocess.TimeoutExpired:
+        print("Process terminated")
+        error = "Process timed out".encode("utf-8")
 
     if error:
         print("Error occurred:")
-        print(error.decode("utf-8"))
+        if type(error) != type(""):
+            error = error.decode("utf-8")
+        print(error)
+        for path in files_to_remove:
+            os.remove(path)
+        os.chdir(script_path)
+        raise ChildProcessError
     else:
         print("PDF 1 generated successfully.")
-        success_flag += 1
 
     # Run twice to get the page numbers to load correctly
-    process = subprocess.Popen(
-        [pdflatex_path, latex_file_path], stdout=subprocess.PIPE, stderr=subprocess.PIPE
-    )
-    output, error = process.communicate()
+    try:
+        completed_process = subprocess.run(
+            [pdflatex_path, "-fmt", "pdflatex", latex_file_path],
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            timeout=TIMEOUT,
+        )
+        error = completed_process.stderr
+
+    except subprocess.TimeoutExpired:
+        print("Process terminated")
+        error = "Process timed out".encode("utf-8")
 
     if error:
         print("Error occurred:")
         print(error.decode("utf-8"))
+        for path in files_to_remove:
+            os.remove(path)
+        os.chdir(script_path)
+        raise ChildProcessError
     else:
         print("PDF 2 generated successfully.")
-        success_flag += 1
-    if success_flag == 2:
-        blob = save_pdf_blob(string_id)
-        rendering.quiz = quiz_data
-        rendering.blob_key = blob
-        rendering.save()
+    blob = save_pdf_blob(string_id)
+    rendering.quiz = quiz_data
+    rendering.blob_key = blob
+    rendering.save()
+
+    for path in files_to_remove:
+        os.remove(path)
+    os.chdir(script_path)
 
 
 def save_pdf_blob(string_id):
     # rename output_quiz.pdf to new file_name
     script_path = os.path.dirname(__file__)
 
-    temp_path = os.path.join(script_path, "..\docs\latex")
-    file_temp = os.path.join(temp_path, "output_quiz.pdf")
+    temp_path = os.path.join(script_path, r"..", "docs", "latex")
+    file_temp = os.path.join(temp_path, r"output_quiz.pdf")
     file_path = os.path.abspath(file_temp)
 
-    new_name = r"..\..\media\pdfs" + "\\" + string_id + ".pdf"
-    pdf_temp = os.path.join(temp_path, new_name)
+    new_name = string_id + ".pdf"
+    pdf_temp = os.path.join(temp_path, "..", "..", "media", "pdfs", new_name)
     pdf_path = os.path.abspath(pdf_temp)
 
     if os.path.isfile(pdf_path):

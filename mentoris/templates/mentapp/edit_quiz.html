@@ -154,6 +154,7 @@
 
         <iframe src="footer.html" width="100%" frameBorder="0"></iframe>
         <script type = "text/javascript">
+            let quiz_state = new Map();
 
             function create_buttons(button_wrapper){
                 let questions_list = document.getElementById("questions_list");
@@ -262,10 +263,26 @@
                 }
                 
                 if(index != list.length-1){
-                    list[index].getElementsByClassName("question_ordering")[0].innerHTML = (index + 1).toString();
+                    /*list[index].getElementsByClassName("question_ordering")[0].innerHTML = (index + 1).toString();
                     list[index + 1].getElementsByClassName("question_ordering")[0].innerHTML = (index).toString();
                     list[index].parentNode.insertBefore(list[index+1], list[index]);   
-                    list[index + 1].scrollIntoView();
+                    list[index + 1].scrollIntoView();*/
+                    let temp = quiz_state.get(index);
+
+                    quiz_state.set(index, quiz_state.get(index + 1));
+                    quiz_state.set(index + 1, temp);
+                    
+                    console.log("redisplay_questions")
+                    console.log(quiz_state);
+                    console.log(list_element);
+
+                    redisplay_questions("questions_list", create_buttons, quiz_state);
+                    setTimeout( () => 
+                    {
+                        list[index + 1].scrollIntoView(true)
+                    }, 500);
+                    console.log(list_element);
+                    
                 }
             }
 
@@ -282,10 +299,18 @@
                 }
                 
                 if(index != 0){
-                    list[index].getElementsByClassName("question_ordering")[0].innerHTML = (index - 1).toString();
-                    list[index - 1].getElementsByClassName("question_ordering")[0].innerHTML = (index).toString();
-                    list[index-1].parentNode.insertBefore(list[index], list[index-1]);
-                    list[index-1].scrollIntoView();
+                    let temp = quiz_state.get(index);
+                    quiz_state.set(index, quiz_state.get(index - 1));
+                    quiz_state.set(index -1, temp);
+                    
+                    list_element =  document.getElementById("questions_list")
+                    console.log("redisplay_questions")
+                    console.log(quiz_state);
+                    redisplay_questions("questions_list", create_buttons, quiz_state);
+                    setTimeout( () => 
+                        {
+                            list[index - 1].scrollIntoView(true)
+                        }, 500);
                 }
             }
 
@@ -301,17 +326,20 @@
                     }
                 });
                 request.done(function(data){
-                    display_questions(data, "questions_list", create_buttons, true);
+                    display_questions(data, "questions_list", create_buttons, true, quiz_state);
                 });
 
                 // Function to handle saving
                 $('#save_button').on('click', function(event){
+                    console.log("pressed saave!")
                     let list = document.getElementById("questions_list").children;
                     let ids = []
 
                     for(var i = 0; i < list.length; ++i){
                         ids.push(list[i].id);
                     }
+                    console.log(list);
+                    console.log("sening ajax");
                     let request = $.ajax({
                         type: "POST",
                         url: "/edit_quiz/{{quiz_instance.quiz_id}}",
