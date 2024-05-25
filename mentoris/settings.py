@@ -23,7 +23,6 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/4.1/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = "django-insecure-pbmmo011$5_b^69e9k-#1#)i8)*!n)io8-y0rz=@&e6@h7s!zk"
 
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
@@ -86,14 +85,7 @@ WSGI_APPLICATION = "mentoris.wsgi.application"
 # https://docs.djangoproject.com/en/4.1/ref/settings/#databases
 
 DATABASES = {
-        'default': {
-        'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME': 'postgres',
-        'USER': 'postgres',
-        'PASSWORD': 'BDFLARcNQhmxHFtT44AV',
-        'HOST': 'mentorisdb.cmkrvc9icttm.us-west-2.rds.amazonaws.com',
-        'PORT': '5659',
-        }
+       
 }
 
 STORAGES = {
@@ -170,9 +162,3 @@ AUTHENTICATION_BACKENDS = [
 ]
 
 # Email Notifications
-EMAIL_BACKEND = "django_ses.SESBackend"
-EMAIL_HOST = "email-smtp.us-east-1.amazonaws.com"
-EMAIL_PORT = 465
-EMAIL_HOST_USER = "AKIAS5CSTZDUFJFNGP2Z"
-EMAIL_HOST_PASSWORD = "BIFxfnFCerF2f4JiRwLx8MYpRykHZDMSr8h7TLR3IleU"
-EMAIL_USE_TLS = True
