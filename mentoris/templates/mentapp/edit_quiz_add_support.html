@@ -229,7 +229,9 @@
                             }
 
                             if (index !== -1) {
-                                let support_id = list[index].id;
+                                let support_id = list[index].querySelector('.bordered iframe')
+                                    .src.split("/")[5];
+
                                 if (support_id) {
                                     var pathname = window.location.pathname;
                                     var segments = pathname.split('/');

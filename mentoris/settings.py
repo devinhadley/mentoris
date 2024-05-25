@@ -85,7 +85,16 @@ WSGI_APPLICATION = "mentoris.wsgi.application"
 # Database
 # https://docs.djangoproject.com/en/4.1/ref/settings/#databases
 
-DATABASES = {}
+DATABASES = {
+        'default': {
+        'ENGINE': 'django.db.backends.postgresql_psycopg2',
+        'NAME': 'postgres',
+        'USER': 'postgres',
+        'PASSWORD': 'BDFLARcNQhmxHFtT44AV',
+        'HOST': 'mentorisdb.cmkrvc9icttm.us-west-2.rds.amazonaws.com',
+        'PORT': '5659',
+        }
+}
 
 STORAGES = {
     "default": {

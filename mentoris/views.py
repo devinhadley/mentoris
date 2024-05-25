@@ -1338,7 +1338,7 @@ def create_support(request, quiz_id):
     if request.method == "POST":
 
         support = Support.objects.create(volume_id=Volume.objects.first())
-        support_loc = Support_Loc.objects.create(support=support, title_latex="")
+        support_loc = Support_Loc.objects.create(support=support, title="")
 
         return redirect(f"/edit_support/{quiz_id}/{support.support_id}")
 
@@ -1353,9 +1353,10 @@ def edit_support(request, quiz_id, support_id):
         .order_by("volume_id")
     )
     support_loc = get_object_or_404(Support_Loc, support=support_object)
+    creators = User.objects.all()
 
     content = support_loc.content_latex
-    title = support_loc.title_latex
+    title = support_loc.title
     volume_id = support_object.volume_id
 
     form = LatexForm(
@@ -1383,13 +1384,10 @@ def edit_support(request, quiz_id, support_id):
                 support=support,
                 title=support_title,
                 content_latex=support_content,
-                creator_id=creators.first()[0],
-                approver_id=creators.first()[0],
+                creator=request.user,
+                approver=creators.first()
             )
 
-            support_loc.title_latex = support_title
-            support_loc.content_latex = support_content
-            support_loc.creator = (request.user,)
             support_loc.save()
 
             for attachment in support_attachments:
@@ -1711,4 +1709,5 @@ def edit_question(request, question_id):
                 "volume_id": volume_id,
                 "chapters": chapter_locs,
                 "chapter": chapter_object,
+            }
         )

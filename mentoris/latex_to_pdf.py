@@ -71,7 +71,6 @@ quiz_data: quiz object
 
 
 def latex_to_pdf(latex_question_list, support_list, quiz_data):
-def latex_to_pdf(latex_question_list, support_list, quiz_data):
     script_path = os.path.dirname(__file__)
     file_location = os.path.join(script_path, "..", "docs", "latex", "output_quiz.tex")
     file_location = os.path.join(script_path, "..", "docs", "latex", "output_quiz.tex")
