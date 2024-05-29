@@ -1377,16 +1377,15 @@ def edit_support(request, quiz_id, support_id):
 
         if "submit-support" in request.POST:
 
-            support = Support(volume_id=volume)
-            support.save()
+            support_object.volume_id=volume
+            support_object.save()
 
-            support_loc = Support_Loc(
-                support=support,
-                title=support_title,
-                content_latex=support_content,
-                creator=request.user,
-                approver=creators.first()
-            )
+            
+            support_loc.title=support_title
+            support_loc.content_latex=support_content
+            support_loc.creator=(request.user)
+            support_loc.approver=creators.first()
+            
 
             support_loc.save()
 
