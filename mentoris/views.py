@@ -1024,7 +1024,6 @@ def edit_quiz_add_question(request, quiz_id):
                         question=question_instance,
                         ordering=quiz_questions.count(),
                     )
-
             return JsonResponse({"success": True})
     elif request.method == "GET" and request.GET.get("command") == "filter":
         chapter_filter = request.GET.get("chapter")
@@ -1033,7 +1032,7 @@ def edit_quiz_add_question(request, quiz_id):
         point_filter = request.GET.get("point")
         time_filter = request.GET.get("time")
         difficulty_filter = request.GET.get("difficulty")
-        question_instances = Question.objects.all()
+        question_instances = Question.objects.all().filter(approved=True)
 
         if volume_filter:
             question_instances = question_instances.filter(
@@ -1229,7 +1228,7 @@ def verify_email(request):
             email.send()
             return JsonResponse({"success": True})
         else:
-            return redirect("signUp")
+            return redirect("sign_up")
     return render(request, "mentapp/verify_email.html")
 
 
@@ -1239,13 +1238,15 @@ def verify_email_confirm(request, uidb64, token):
         user = User.objects.get(pk=uid)
     except (TypeError, ValueError, OverflowError, User.DoesNotExist):
         user = None
+
     if user and email_verification_token.check_token(user, token):
-        email = request.user.email
+        email = user.email
         email_object = Email.objects.get(email_address=email)
         email_object.is_verified = True
         email_object.save()
         messages.success(request, "Your email has been verified.")
-        return redirect(f"/profile/{user.user_id}")
+        login(request, user, backend="django.contrib.auth.backends.ModelBackend")
+        return redirect("user_info", user_id=user.user_id)
     else:
         messages.warning(request, "The link is invalid.")
     return render(request, "mentapp/verify_email_confirm.html")
@@ -1271,9 +1272,32 @@ def verify_email_confirm(request, uidb64, token):
 
 def download_pdf(request, quiz_id):
     quiz_instance = get_object_or_404(Quiz, quiz_id=quiz_id)
-    quiz_rendering_instance = Quiz_Rendering.objects.filter(quiz=quiz_instance).latest(
-        "date_created"
-    )
+    try:
+        quiz_rendering_instance = Quiz_Rendering.objects.filter(
+            quiz=quiz_instance
+        ).latest("date_created")
+    except:
+        # function that saves the PDF
+        question_list = []
+        support_list = []
+
+        quiz_question_list = Quiz_Question.objects.filter(quiz=quiz_instance)
+        for quiz_question in quiz_question_list:
+            question_meta = quiz_question.question
+            question_content = get_object_or_404(Question_Loc, question=question_meta)
+            question_list.append(question_content)
+
+        quiz_support_list = Quiz_Support.objects.filter(quiz=quiz_instance)
+        for quiz_support in quiz_support_list:
+            support_meta = quiz_support.support
+            support_content = get_object_or_404(Support_Loc, support=support_meta)
+            support_list.append(support_content)
+        try:
+            latex_to_pdf(question_list, support_list, quiz_instance)
+        except:
+            print("Failed to save pdf")
+            raise SystemError
+        return download_pdf(request, quiz_id)
     blob_instance = quiz_rendering_instance.blob_key
 
     response = HttpResponse(blob_instance.file, content_type="application/pdf")
@@ -1434,22 +1458,9 @@ def edit_support(request, quiz_id, support_id):
 
 
 def create_question(request):
-
-    volumes = (
-        Volume.objects.values_list("volume_id", flat=True)
-        .distinct()
-        .order_by("volume_id")
-    )
-
-    volume_id = 1
-    chapters = Chapter.objects.filter(volume__volume_id=volume_id).distinct()
-
-    chapter_locs = Chapter_Loc.objects.filter(
-        chapter__chapter_id__in=chapters
-    ).distinct()
-
-    chapter_object = chapter_locs[0]
     if request.method == "POST":
+        volume_id = 1
+        chapters = Chapter.objects.filter(volume__volume_id=volume_id).distinct()
 
         question = Question.objects.create(chapter=chapters[0])
         question_loc = Question_Loc.objects.create(question=question)
@@ -1589,8 +1600,6 @@ def edit_question(request, question_id):
 
         if request.method == "POST":
 
-            # TODO: question_object.creator = CURRENT USER
-
             if request.POST.get("command") == "deleteAttachment":
                 attachment = get_object_or_404(Question_Attachment, question = question_loc, filename = request.POST.get("filename"))
                 attachment.blob_key.delete()
@@ -1666,6 +1675,7 @@ def edit_question(request, question_id):
                 chapter_id = chapter_loc.chapter.chapter_id
 
                 return redirect(f"/main/{volume_id}/{chapter_id}")
+
 
         if "volume-button" not in request.POST:
             chapter_object = request.POST.get("chapter")
