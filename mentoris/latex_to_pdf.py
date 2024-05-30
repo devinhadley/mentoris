@@ -11,10 +11,7 @@ from mentapp.models import (
     Blob,
     Question_Attachment,
     Support_Attachment,
-    Support_Attachment,
 )
-
-TIMEOUT = 10  # try to render the PDF for 10 seconds before failing
 
 TIMEOUT = 10  # try to render the PDF for 10 seconds before failing
 
