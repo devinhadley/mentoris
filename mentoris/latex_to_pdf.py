@@ -88,7 +88,6 @@ def latex_to_pdf(latex_question_list, support_list, quiz_data):
 
     rendering = Quiz_Rendering()
 
-
     recent_id = 0
     try:
         recent_id = Quiz_Rendering.objects.latest("date_created").rendering_id
@@ -416,7 +415,8 @@ def latex_to_pdf(latex_question_list, support_list, quiz_data):
     # Path to pdflatex command
     temp_path = os.path.join(
         script_path, r"..", tex_live_folder, "bin", os_folder, "pdftex"
-   
+    )
+
     pdflatex_path = os.path.abspath(temp_path)
 
     # Path to LaTeX file
@@ -488,7 +488,6 @@ def latex_to_pdf(latex_question_list, support_list, quiz_data):
     rendering.quiz = quiz_data
     rendering.blob_key = blob
     rendering.save()
-    
 
     for path in files_to_remove:
         os.remove(path)
