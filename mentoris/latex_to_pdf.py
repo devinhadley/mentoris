@@ -86,6 +86,7 @@ def latex_to_pdf(latex_question_list, support_list, quiz_data):
 
     rendering = Quiz_Rendering()
 
+
     recent_id = 0
     try:
         recent_id = Quiz_Rendering.objects.latest("date_created").rendering_id
@@ -223,6 +224,19 @@ def latex_to_pdf(latex_question_list, support_list, quiz_data):
                 + latex_question
                 + "\n\n"
             )
+        for question_loc in latex_question_list:
+            latex_question = question_loc.question_latex
+            point = int(question_loc.question.point_value)
+            plural = "" if point == 1 else "s"
+            output_file.write(
+                r"\item ("
+                + str(point)
+                + r" point"
+                + plural
+                + r") "
+                + latex_question
+                + "\n\n"
+            )
 
             attachment_list = Question_Attachment.objects.filter(question=question_loc)
             for attachment in attachment_list:
@@ -311,6 +325,61 @@ def latex_to_pdf(latex_question_list, support_list, quiz_data):
 
         output_file.write(r"\end{enumerate}" + "\n")
 
+    # Answer Key
+    if len(latex_question_list) > 0:  # Checks if quiz is empty
+        output_file.write(r"\newpage")
+        output_file.write(r"\setcounter{page}{1}")
+        output_file.write(r"\begin{center}")
+        output_file.write(r"\LARGE Answer Key")
+        output_file.write(r"\vspace{0.5em}")
+        output_file.write(r"\end{center}")
+        output_file.write(r"\begin{enumerate}" + "\n\n")
+        output_file.write(r"\vspace{0.25cm}" + "\n")
+
+        for question_loc in latex_question_list:
+            latex_question = question_loc.question_latex
+            point = int(question_loc.question.point_value)
+            plural = "" if point == 1 else "s"
+            output_file.write(
+                r"\item ("
+                + str(point)
+                + r" point"
+                + plural
+                + r") "
+                + latex_question
+                + "\n\n"
+            )
+
+            attachment_list = Question_Attachment.objects.filter(question=question_loc)
+            for attachment in attachment_list:
+                blob = attachment.blob_key
+
+                shutil.copy(blob_path, final_path)
+
+                output_file.write(r"\vspace{0.2cm}" + "\n")
+                output_file.write(r"\begin{center}" + "\n")
+
+                # removes file extension from  file_name
+                dotIndex = blob.filename[::-1].find(".")
+                blob_filename = blob.filename[: -1 * dotIndex - 1]
+
+                output_file.write(
+                    r"\includegraphics[width=2cm]{" + blob_filename + r"}" + "\n"
+                )
+                output_file.write(r"\end{center}" + "\n")
+
+            answer_latex = question_loc.answer_latex
+            output_file.write(r"\color{red}")
+            output_file.write(answer_latex + "\n\n")
+            output_file.write(r"\color{black}")
+            answer_length = str(answer_latex).count("\n") + 1
+
+            pages_required = question_loc.question.pages_required
+            spacingString = pagesRequiredToSpacing(pages_required, answer_length)
+            output_file.write(r"\vspace{" + spacingString + r"}" + "\n\n")
+
+        output_file.write(r"\end{enumerate}" + "\n")
+
     output_file.write(r"\end{document}" + "\n")
 
     output_file.close()
@@ -325,7 +394,7 @@ def latex_to_pdf(latex_question_list, support_list, quiz_data):
     # Path to pdflatex command
     temp_path = os.path.join(
         script_path, r"..", tex_live_folder, "bin", os_folder, "pdftex"
-    )
+   
     pdflatex_path = os.path.abspath(temp_path)
 
     # Path to LaTeX file
@@ -355,7 +424,9 @@ def latex_to_pdf(latex_question_list, support_list, quiz_data):
 
     if error:
         print("Error occurred:")
-        print(error.decode("utf-8"))
+        if type(error) != type(""):
+            error = error.decode("utf-8")
+        print(error)
         for path in files_to_remove:
             os.remove(path)
         os.chdir(script_path)
@@ -385,12 +456,17 @@ def latex_to_pdf(latex_question_list, support_list, quiz_data):
             os.remove(path)
         os.chdir(script_path)
         raise ChildProcessError
+        for path in files_to_remove:
+            os.remove(path)
+        os.chdir(script_path)
+        raise ChildProcessError
     else:
         print("PDF 2 generated successfully.")
     blob = save_pdf_blob(string_id)
     rendering.quiz = quiz_data
     rendering.blob_key = blob
     rendering.save()
+    
 
     for path in files_to_remove:
         os.remove(path)
