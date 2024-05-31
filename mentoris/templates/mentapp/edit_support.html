@@ -242,15 +242,15 @@
             * @param {HTMLElement} outputElement - The container to place the LaTeX iframe in.
             * @param {string} part - The part of the question to display (question, answer or rubric)
             */
-            function updateIframe(outputElement, part) {
+            function updateIframe(outputElement) {
                 outputElement.innerHTML = "";
                 let smallPreview = document.createElement('iframe');
                 let bigPreview = document.getElementById("big-preview");
                 outputElement.appendChild(smallPreview);
 
                 smallPreview.src = "/latex_window/support/" + {{ support_id }
-            } + "/" + part + "/" + widthHTMLElement(smallPreview.contentDocument.body) + "/";
-            bigPreview.src = "/latex_window/support/" + {{ support_id }} + "/" + part + "/" + widthHTMLElement(bigPreview.contentDocument.body) + "/";
+            } + "/" + widthHTMLElement(smallPreview.contentDocument.body) + "/";
+            bigPreview.src = "/latex_window/support/" + {{ support_id }} + "/" + widthHTMLElement(bigPreview.contentDocument.body) + "/";
 
             initLatexFrame(bigPreview);
             initLatexFrame(smallPreview);
@@ -277,7 +277,7 @@
                 });
                 request.done(function (data) {
                     let outputElement = document.getElementById(outputId);
-                    updateIframe(outputElement, command);
+                    updateIframe(outputElement);
                 });
             }
 
