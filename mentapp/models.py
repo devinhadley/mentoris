@@ -1,20 +1,55 @@
 from django.db import models
-from django.contrib.auth.hashers import make_password, check_password
-from django.dispatch import receiver
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
-from django.db.models.signals import pre_save
-from datetime import datetime
 import uuid
+
+from django.contrib.auth.models import (
+    AbstractBaseUser,
+    PermissionsMixin,
+    BaseUserManager,
+)
+
+
+class CustomUserManager(BaseUserManager):
+    def create_user(self, email, user_id=None, password=None, **extra_fields):
+        """
+        Creates and saves a User with the given email and password.
+        """
+        if not email:
+
+            raise ValueError("The Email field must be set")
+        if not user_id:
+            user_id = generate_user_id()
+
+        user = self.model(email=email, user_id=user_id, **extra_fields)
+        user.set_password(password)
+        user.save(using=self._db)
+        return user
+
+    def create_superuser(self, email, user_id=None, password=None, **extra_fields):
+        """
+        Creates and saves a superuser with the given email and password.
+        """
+
+        extra_fields.setdefault("is_admin", True)
+        extra_fields.setdefault("is_superuser", True)
+        extra_fields.setdefault("is_staff", True)
+        extra_fields.setdefault("is_verified", True)
+
+        return self.create_user(
+            email, user_id=user_id, password=password, **extra_fields
+        )
 
 
 def generate_user_id():
     return str(uuid.uuid4())
 
-class User(models.Model):
-    user_id = models.UUIDField(
-        primary_key=True, unique=True, default=uuid.uuid4, editable=False
+
+class User(AbstractBaseUser, PermissionsMixin):
+    email = models.CharField(
+        max_length=100, primary_key=True, default="email@default.com"
     )
+    user_id = models.UUIDField(unique=True, default=uuid.uuid4, editable=False)
     full_name = models.CharField(max_length=50, default="new_user")
     password_hash = models.CharField(max_length=128, default="password")
     org_name = models.CharField(max_length=50, default="org")
@@ -29,12 +64,12 @@ class User(models.Model):
     is_admin = models.BooleanField(default=False)
     is_quizmaker = models.BooleanField(default=False)
     is_active = models.BooleanField(default=True)
+    is_staff = models.BooleanField(default=False)
 
-    def set_password(self, raw_password):
-        return make_password(password=raw_password)
+    USERNAME_FIELD = "email"
+    REQUIRED_FIELDS = []
 
-    def check_password(self, raw_password):
-        return check_password(raw_password, self.password_hash)
+    objects = CustomUserManager()
 
     def __str__(self):
         return f"""{self.full_name},
@@ -83,6 +118,9 @@ class Question(models.Model):
     point_value = models.FloatField(default=0)
     pages_required = models.FloatField(default=0)
 
+    approval_requested = models.BooleanField(default=True)
+    approved = models.BooleanField(default=False)
+
 
 class Question_Loc(models.Model):
     question = models.ForeignKey(Question, on_delete=models.CASCADE)
@@ -121,7 +159,7 @@ class Question_Loc(models.Model):
 
 class Blob(models.Model):
     blob_key = models.AutoField(primary_key=True)
-    file = models.FileField(upload_to='pdfs/', null=True, blank=True)
+    file = models.FileField(upload_to="pdfs/", null=True, blank=True)
     content_type = models.CharField(max_length=255, null=True, blank=True)
     filename = models.CharField(max_length=255, null=True, blank=True)
 
@@ -134,7 +172,7 @@ class Question_Attachment(models.Model):
     blob_key = models.ForeignKey(Blob, on_delete=models.CASCADE, null=True)
 
     class Meta:
-        unique_together = ("question","filename", "lang_code", "dialect_code")
+        unique_together = ("question", "filename", "lang_code", "dialect_code")
         indexes = [
             models.Index(
                 fields=["question", "filename", "lang_code", "dialect_code"],
@@ -142,32 +180,15 @@ class Question_Attachment(models.Model):
             )
         ]
 
+
 class Support(models.Model):
     support_id = models.AutoField(primary_key=True, editable=False)
     volume_id = models.ForeignKey(Volume, null=True, on_delete=models.CASCADE)
-    
-
-class Support_Attachment(models.Model):
-    support = models.ForeignKey(Support, null=True, on_delete=models.CASCADE)
-    lang_code = models.CharField(max_length=5)
-    dialect_code = models.CharField(max_length=5)
-    filename = models.FileField(
-        upload_to="support_attachments/",
-    )
-    blob_key = models.ForeignKey(Blob, on_delete=models.CASCADE, null=True)
-
-    class Meta:
-        unique_together = ("support", "lang_code", "dialect_code","blob_key")
-        indexes = [
-            models.Index(
-                fields=["support", "lang_code", "dialect_code","blob_key"],
-                name="support_attachment_comp_pkey",
-            )
-        ]
 
 
 class Quiz(models.Model):
     quiz_id = models.AutoField(primary_key=True)
+    label = models.CharField(max_length=255, null=True, blank=True)
     conceptual_difficulty = models.FloatField()
     time_required_mins = models.IntegerField()
     calculator_allowed = models.BooleanField(default=False)
@@ -176,7 +197,7 @@ class Quiz(models.Model):
     book_allowed = models.BooleanField(default=False)
     volume = models.ForeignKey(Volume, on_delete=models.SET_NULL, null=True)
     chapter = models.ForeignKey(Chapter, on_delete=models.SET_NULL, null=True)
-    creator = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
+    creator_id = models.ForeignKey(User, on_delete=models.SET_NULL, null=True)
 
 
 class Quiz_Question(models.Model):
@@ -203,37 +224,22 @@ class Quiz_Rendering(models.Model):
     paper_size = models.CharField(default="8x11", max_length=50)
     blob_key = models.ForeignKey(Blob, on_delete=models.CASCADE, null=True)
 
-    class Meta:
-        unique_together = ("quiz", "lang_code", "dialect_code")
-        indexes = [
-            models.Index(
-                fields=["quiz", "lang_code", "dialect_code"],
-                name="quiz_rendering_comp_pkey",
-            )
-        ]
-
 
 class Quiz_Feedback(models.Model):
-    quiz = models.ForeignKey(Quiz_Rendering, on_delete=models.CASCADE)
-    lang_code = models.CharField(max_length=5, default="ENG")
-    dialect_code = models.CharField(max_length=5, default="US")
-    date_created = models.DateTimeField(default=now)
-    date_completed = models.DateTimeField(default=now)
-    status = models.CharField(max_length=300, null=True)
-    creator_id = models.CharField(max_length=50, null=True)
-    viewer_id = models.CharField(max_length=50, null=True)
+    feedback_id = models.AutoField(primary_key=True)
+    quiz = models.ForeignKey(Quiz, on_delete=models.CASCADE)
+    creator_id = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, related_name="creator_id"
+    )
+    date_created = models.DateField(default=now)
+    date_completed = models.DateField(null=True, blank=True)
+    viewer_id = models.ForeignKey(
+        User, on_delete=models.SET_NULL, null=True, related_name="viewer_id"
+    )
     challenge_rating = models.IntegerField(default=0)
     time_rating = models.IntegerField(default=0)
-    comments_text = models.TextField(null=True)
-
-    class Meta:
-        unique_together = ("quiz", "lang_code", "dialect_code")
-        indexes = [
-            models.Index(
-                fields=["quiz", "lang_code", "dialect_code"],
-                name="quiz_feedback_comp_pkey",
-            )
-        ]
+    creator_comment = models.TextField(default="")
+    viewer_comment = models.TextField()
 
 
 class Email(models.Model):
@@ -253,7 +259,7 @@ class Site(models.Model):
 
 
 class Handle(models.Model):
-    handle_id = models.CharField(max_length=100, primary_key=True, default="handle")
+    handle_id = models.AutoField(primary_key=True)
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     site = models.ForeignKey(Site, on_delete=models.CASCADE, null=True)
     handle = models.CharField(max_length=50, default="handle")
@@ -316,19 +322,26 @@ class Language(models.Model):
             )
         ]
 
+
 class Support_Loc(models.Model):
     support = models.ForeignKey(Support, on_delete=models.CASCADE)
     lang_code = models.CharField(max_length=5, default="ENG")
     dialect_code = models.CharField(max_length=5, default="US")
-    title_latex = models.CharField(max_length=100, null=True)
-    content_latex = models.CharField(max_length=500, null=True)
+    title = models.CharField(max_length=100, null=True)
+    content_latex = models.TextField(default="")
     date_created = models.DateTimeField(default=now)
     date_approved = models.DateTimeField(default=now)
     creator = models.ForeignKey(
-        User, on_delete=models.CASCADE, related_name="created_support_loc", 
+        User,
+        on_delete=models.CASCADE,
+        null=True,
+        related_name="created_support_loc",
     )
     approver = models.ForeignKey(
-        User, on_delete=models.CASCADE, related_name="approved_support_loc"
+        User, 
+        on_delete=models.CASCADE, 
+        null=True,
+        related_name="approved_support_loc"
     )
 
     class Meta:
@@ -337,6 +350,23 @@ class Support_Loc(models.Model):
             models.Index(
                 fields=["support", "lang_code", "dialect_code"],
                 name="support_loc_comp_pkey",
+            )
+        ]
+
+
+class Support_Attachment(models.Model):
+    support = models.ForeignKey(Support_Loc, null=True, on_delete=models.CASCADE)
+    lang_code = models.CharField(max_length=5)
+    dialect_code = models.CharField(max_length=5)
+    filename = models.CharField(max_length=255)
+    blob_key = models.ForeignKey(Blob, on_delete=models.CASCADE, null=True)
+
+    class Meta:
+        unique_together = ("support", "lang_code", "dialect_code", "blob_key")
+        indexes = [
+            models.Index(
+                fields=["support", "lang_code", "dialect_code", "blob_key"],
+                name="support_attachment_comp_pkey",
             )
         ]
 
