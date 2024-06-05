@@ -1650,9 +1650,9 @@ def edit_question(request, question_id):
             question_loc.save()
 
 
-                chapter_id = chapter_loc.chapter.chapter_id
+            chapter_id = chapter_loc.chapter.chapter_id
 
-                return redirect(f"/main/{volume_id}/{chapter_id}")
+            return redirect(f"/main/{volume_id}/{chapter_id}")
 
     if "volume-button" not in request.POST:
         chapter_object = request.POST.get("chapter")
