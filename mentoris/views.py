@@ -1,5 +1,7 @@
 import base64
-import json, os, random
+import json
+import os
+import random
 from datetime import date
 from django.http import HttpResponse, JsonResponse, HttpResponseForbidden
 from django.contrib import messages
@@ -43,6 +45,7 @@ from mentapp.models import (
     Site,
     Quiz_Support,
     Handle,
+    Chapter_Feedback
 )
 from mentoris.email_verification_token_generator import email_verification_token
 from mentoris.forms import UserForm, LatexForm, QuizForm
@@ -164,8 +167,9 @@ def latex(request, question_id):
                 Question_Loc, question=question, lang_code="ENG", dialect_code="US"
             )
             for filename, file in request.FILES.items():
-                name = filename[0 : filename.rfind(".")]
-                blob = Blob(file=file, content_type=file.content_type, filename=name)
+                name = filename[0: filename.rfind(".")]
+                blob = Blob(
+                    file=file, content_type=file.content_type, filename=name)
                 attachment = Question_Attachment(
                     question=question_loc, blob_key=blob, filename=name
                 )
@@ -179,7 +183,8 @@ def latex(request, question_id):
         grading = request.POST.get("latex_grading")
         volume_id = request.POST.get("volume")
         volume_id = int(volume_id)
-        chapters = Chapter.objects.filter(volume__volume_id=volume_id).distinct()
+        chapters = Chapter.objects.filter(
+            volume__volume_id=volume_id).distinct()
 
         chapter_locs = Chapter_Loc.objects.filter(
             chapter__chapter_id__in=chapters
@@ -197,8 +202,10 @@ def latex(request, question_id):
             chapter_loc = get_object_or_404(Chapter_Loc, title=chapter_title)
             question_object.chapter = chapter_loc.chapter
 
-            question_object.conceptual_difficulty = request.POST.get("difficulty")
-            question_object.time_required_mins = request.POST.get("time_required")
+            question_object.conceptual_difficulty = request.POST.get(
+                "difficulty")
+            question_object.time_required_mins = request.POST.get(
+                "time_required")
             question_object.point_value = request.POST.get("points")
             question_object.pages_required = request.POST.get("pages_required")
             question_object.save()
@@ -238,7 +245,8 @@ def latex(request, question_id):
             chapter_object = request.POST.get("chapter")
             chapter_string = chapter_object.split("_")
             chapter_title = chapter_string[0]
-            chapter_object = get_object_or_404(Chapter_Loc, title=chapter_title)
+            chapter_object = get_object_or_404(
+                Chapter_Loc, title=chapter_title)
         else:
             chapter_object = chapters[0]
 
@@ -371,6 +379,7 @@ def sign_up(request):
     else:
         return render(request, "mentapp/sign_up.html")
 
+
 @login_required
 def profile(request):
     template = loader.get_template("mentapp/profile.html")
@@ -463,7 +472,8 @@ def main(request, volume_id=1):
     )
 
     if volume_id:
-        chapters = Chapter.objects.filter(volume__volume_id=volume_id).distinct()
+        chapters = Chapter.objects.filter(
+            volume__volume_id=volume_id).distinct()
     else:
         chapters = []
 
@@ -519,7 +529,8 @@ def quiz(request, volume_id, chapter_id, quiz_id):
             feedback.creator_id = quiz_id.creator_id
             feedback.viewer_id = request.user
 
-            feedback.challenge_rating = int(request.POST.get("challenge_rating"))
+            feedback.challenge_rating = int(
+                request.POST.get("challenge_rating"))
             feedback.time_rating = int(request.POST.get("time_rating"))
             feedback.viewer_comment = request.POST.get("viewer_comment")
             feedback.save()
@@ -548,7 +559,8 @@ def quiz(request, volume_id, chapter_id, quiz_id):
             for review in review_objects:
                 challenge_ratings += review.challenge_rating
                 time_ratings += review.time_rating
-                email = Email.objects.get(user=review.viewer_id, is_primary=True)
+                email = Email.objects.get(
+                    user=review.viewer_id, is_primary=True)
                 reviews.append([email, review])
 
             if len(review_objects) > 1:
@@ -622,7 +634,8 @@ def quiz_maker_view(request, volume_id, chapter_id, quiz_id):
             for review in review_objects:
                 challenge_ratings += review.challenge_rating
                 time_ratings += review.time_rating
-                email = Email.objects.get(user=review.viewer_id, is_primary=True)
+                email = Email.objects.get(
+                    user=review.viewer_id, is_primary=True)
                 reviews.append([email, review])
 
             avg_rating = challenge_ratings / len(review_objects)
@@ -841,7 +854,8 @@ def user_info(request, user_id):
 
     try:
         email = Email.objects.get(user=user_profile, is_primary=True)
-        other_emails = Email.objects.filter(user=user_profile, is_primary=False)
+        other_emails = Email.objects.filter(
+            user=user_profile, is_primary=False)
         other_emailss = [obj.email_address for obj in other_emails]
         other_email = ", ".join(other_emailss)
     except Email.DoesNotExist:
@@ -874,7 +888,8 @@ def grab_questions_data_table(questions):
                 question=question.question_id, lang_code="ENG", dialect_code="US"
             )
         )
-        question_attachments = Question_Attachment.objects.filter(question=question_Loc)
+        question_attachments = Question_Attachment.objects.filter(
+            question=question_Loc)
 
         attachment_urls = list()
         for question_attachment in question_attachments:
@@ -1002,7 +1017,7 @@ def edit_quiz(request, quiz_id):
                         )
                         support_list.append(support_content)
 
-            #latex_to_pdf(question_list, support_list, quiz_instance)
+            # latex_to_pdf(question_list, support_list, quiz_instance)
             return JsonResponse({"success": True})
     else:
         if request.GET.get("command") == "fetch_quiz_questions":
@@ -1063,13 +1078,16 @@ def edit_quiz_add_question(request, quiz_id):
             )
 
         if chapter_filter:
-            question_instances = question_instances.filter(chapter=chapter_filter)
+            question_instances = question_instances.filter(
+                chapter=chapter_filter)
 
         if creator_filter:
-            question_instances = question_instances.filter(creator=creator_filter)
+            question_instances = question_instances.filter(
+                creator=creator_filter)
 
         if point_filter:
-            question_instances = question_instances.filter(point_value=point_filter)
+            question_instances = question_instances.filter(
+                point_value=point_filter)
 
         if difficulty_filter:
             question_instances = question_instances.filter(
@@ -1108,11 +1126,13 @@ def edit_quiz_add_support(request, quiz_id):
             quiz_supports = (
                 Quiz_Support.objects.all().filter(quiz=quiz_id).order_by("ordering")
             )
-            supports_to_add_id_str = json.loads(request.POST.get("supports_to_add_ids"))
+            supports_to_add_id_str = json.loads(
+                request.POST.get("supports_to_add_ids"))
 
             for support_id in supports_to_add_id_str:
                 if quiz_supports.filter(support_id=support_id).count() == 0:
-                    support_instance = get_object_or_404(Support, support_id=support_id)
+                    support_instance = get_object_or_404(
+                        Support, support_id=support_id)
                     Quiz_Support.objects.create(
                         quiz=quiz_instance,
                         support=support_instance,
@@ -1132,7 +1152,8 @@ def edit_quiz_add_support(request, quiz_id):
             )
 
         if creator_filter:
-            support_instances = support_instances.filter(creator=creator_filter)
+            support_instances = support_instances.filter(
+                creator=creator_filter)
 
         if title_filter:
             support_instances = support_instances.filter(title=title_filter)
@@ -1147,7 +1168,8 @@ def edit_quiz_add_support(request, quiz_id):
                 .first()
             )
 
-            support_attachments = Support_Attachment.objects.filter(support=support_Loc)
+            support_attachments = Support_Attachment.objects.filter(
+                support=support_Loc)
 
             attachment_urls = list()
             for support_attachment in support_attachments:
@@ -1313,13 +1335,15 @@ def download_pdf(request, quiz_id):
         quiz_question_list = Quiz_Question.objects.filter(quiz=quiz_instance)
         for quiz_question in quiz_question_list:
             question_meta = quiz_question.question
-            question_content = get_object_or_404(Question_Loc, question=question_meta)
+            question_content = get_object_or_404(
+                Question_Loc, question=question_meta)
             question_list.append(question_content)
 
         quiz_support_list = Quiz_Support.objects.filter(quiz=quiz_instance)
         for quiz_support in quiz_support_list:
             support_meta = quiz_support.support
-            support_content = get_object_or_404(Support_Loc, support=support_meta)
+            support_content = get_object_or_404(
+                Support_Loc, support=support_meta)
             support_list.append(support_content)
         try:
             latex_to_pdf(question_list, support_list, quiz_instance)
@@ -1329,7 +1353,11 @@ def download_pdf(request, quiz_id):
     blob_instance = quiz_rendering_instance.blob_key
 
     response = HttpResponse(blob_instance.file, content_type="application/pdf")
-    response["Content-Disposition"] = f'attachment; filename="{blob_instance.filename}"'
+
+    response["Content-Disposition"] = (
+        f'attachment; filename="{blob_instance.filename}"'
+    )
+
     return response
 
 
@@ -1339,7 +1367,8 @@ def upload_pdf(request, pdf_path):
             pdf_content = pdf_file.read()
 
         # Use Django's ContentFile to create a file-like object
-        content_file = ContentFile(pdf_content, name=os.path.basename(pdf_path))
+        content_file = ContentFile(
+            pdf_content, name=os.path.basename(pdf_path))
 
         blob_instance = Blob(
             file=content_file,
@@ -1527,7 +1556,8 @@ def edit_support(request, quiz_id, support_id):
 def create_question(request):
     if request.method == "POST":
         volume_id = 1
-        chapters = Chapter.objects.filter(volume__volume_id=volume_id).distinct()
+        chapters = Chapter.objects.filter(
+            volume__volume_id=volume_id).distinct()
 
         question = Question.objects.create(chapter=chapters[0])
         question_loc = Question_Loc.objects.create(question=question)
@@ -1541,7 +1571,8 @@ def latex_window_question(request, question_id, part, width):
     return render(
         request,
         "mentapp/latex_window.html",
-        {"type": "question", "part": part, "question_id": question_id, "width": width},
+        {"type": "question", "part": part,
+            "question_id": question_id, "width": width},
     )
 
 
@@ -1652,7 +1683,8 @@ def edit_question(request, question_id):
         if request.POST.get("command") == "upload":
             for filename, file in request.FILES.items():
                 name = filename
-                blob = Blob(file=file, content_type=file.content_type, filename=name)
+                blob = Blob(
+                    file=file, content_type=file.content_type, filename=name)
                 attachment = Question_Attachment(
                     question=question_loc, blob_key=blob, filename=name
                 )
@@ -1669,8 +1701,10 @@ def edit_question(request, question_id):
             chapter_loc = get_object_or_404(Chapter_Loc, title=chapter_title)
             question_object.chapter = chapter_loc.chapter
 
-            question_object.conceptual_difficulty = request.POST.get("difficulty")
-            question_object.time_required_mins = request.POST.get("time_required")
+            question_object.conceptual_difficulty = request.POST.get(
+                "difficulty")
+            question_object.time_required_mins = request.POST.get(
+                "time_required")
             question_object.point_value = request.POST.get("points")
             question_object.pages_required = request.POST.get("pages_required")
             question_object.save()
@@ -1737,13 +1771,57 @@ def handles(request):
 def delete_handle(request, handle, site_id, user_id):
     curr_user = get_object_or_404(User, user_id=user_id)
     curr_site = get_object_or_404(Site, site_id=site_id)
-    handle = get_object_or_404(Handle, handle=handle, site=curr_site, user=curr_user)
+    handle = get_object_or_404(
+        Handle, handle=handle, site=curr_site, user=curr_user)
     if request.method == "POST":
         handle.delete()
     # Redirect to the referring page, or a default page if no referrer is found
     return redirect(request.META.get("HTTP_REFERER", "/"))
 
+
 def customLogout(request):
     if request.method == "GET":
         logout(request)
     return render(request, "mentapp/login.html")
+
+
+def create_feedback(request):
+    if request.method == 'POST':
+        chapter_id = request.POST.get('chapter_id')
+        lang_code = request.POST.get('lang_code', 'ENG')
+        dialect_code = request.POST.get('dialect_code', 'US')
+        major_version = request.POST.get('major_version')
+        minor_version = request.POST.get('minor_version')
+        status = request.POST.get('status', 'PENDING')
+        creator_email = request.POST.get('creator_email')
+        creator_comment = request.POST.get('creator_comment', '')
+
+        chapter = get_object_or_404(Chapter, id=chapter_id)
+
+        if not major_version or not minor_version:
+            return JsonResponse(
+                {"error": "Major and minor versions are required."},
+                status=400
+            )
+
+        feedback = Chapter_Feedback.objects.create(
+            chapter=chapter,
+            lang_code=lang_code,
+            dialect_code=dialect_code,
+            major_version=int(major_version),
+            minor_version=int(minor_version),
+            status=status,
+            creator_email=creator_email,
+            creator_comment=creator_comment,
+        )
+
+        return JsonResponse(
+            {
+                "message": "Feedback created successfully",
+                "id": feedback.id,
+                "status": feedback.status,
+                "major_version": feedback.major_version,
+                "minor_version": feedback.minor_version,
+            },
+            status=201
+        )

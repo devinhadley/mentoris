@@ -1,9 +1,11 @@
+from django.contrib.auth.models import User
 from django.db import models
 from django.utils.timezone import now
 from django.utils.translation import gettext_lazy as _
 import uuid
 from django.contrib.auth.models import AbstractBaseUser,  PermissionsMixin, BaseUserManager
 from django.urls import reverse
+
 
 class CustomUserManager(BaseUserManager):
     def create_user(self, email, user_id=None, password=None, **extra_fields):
@@ -203,7 +205,8 @@ class Quiz_Question(models.Model):
     class Meta:
         unique_together = ("quiz", "question")
         indexes = [
-            models.Index(fields=["quiz", "question"], name="quiz_question_comp_pkey")
+            models.Index(fields=["quiz", "question"],
+                         name="quiz_question_comp_pkey")
         ]
 
     def __lt__(self, other):
@@ -238,7 +241,8 @@ class Quiz_Feedback(models.Model):
 
 
 class Email(models.Model):
-    email_address = models.CharField(max_length=100, primary_key=True, default="email")
+    email_address = models.CharField(
+        max_length=100, primary_key=True, default="email")
     user = models.ForeignKey(
         User,
         on_delete=models.CASCADE,
@@ -250,7 +254,8 @@ class Email(models.Model):
 
 
 class Site(models.Model):
-    site_id = models.CharField(max_length=100, primary_key=True, default="site")
+    site_id = models.CharField(
+        max_length=100, primary_key=True, default="site")
     name = models.CharField(max_length=100, default="name")
 
 
@@ -259,8 +264,10 @@ class Handle(models.Model):
     site = models.ForeignKey(Site, on_delete=models.CASCADE, null=True)
     handle = models.CharField(max_length=50, default="handle")
     is_verified = models.BooleanField(default=False)
+
     class Meta:
         unique_together = ('user', 'handle', 'site')
+
     def get_absolute_url(self):
         return reverse('delete_handle', args=[str(self.id)])
 
@@ -278,27 +285,36 @@ class Verification(models.Model):
     class Meta:
         unique_together = ("verifier", "verified")
         indexes = [
-            models.Index(fields=["verifier", "verified"], name="verification_comp_pkey")
+            models.Index(fields=["verifier", "verified"],
+                         name="verification_comp_pkey")
         ]
 
 
 class Chapter_Feedback(models.Model):
+    # TODO: Clarify what status should be!
+    STATUS_CHOICES = [
+        ('PENDING', 'Pending'),
+        ('APPROVED', 'Approved'),
+        ('REJECTED', 'Rejected'),
+    ]
     chapter = models.ForeignKey(Chapter, on_delete=models.CASCADE)
     lang_code = models.CharField(max_length=5, default="ENG")
     dialect_code = models.CharField(max_length=5, default="US")
+    # TODO: Major and minor should be part of chapter right?
+    major_version = models.IntegerField()
+    minor_version = models.IntegerField()
     date_created = models.DateTimeField(default=now)
-    status = models.CharField(max_length=300, null=True)
-    creator = models.ForeignKey(
-        User, on_delete=models.CASCADE, related_name="created_chapter_feedback"
-    )
+    status = models.CharField(
+        max_length=20, choices=STATUS_CHOICES, default='PENDING')
+    creator_email = models.EmailField(max_length=254)
     viewer = models.ForeignKey(
         User, on_delete=models.CASCADE, related_name="viewed_chapter_feedback"
     )
-    creator_comment = models.CharField(max_length=300, null=True)
-    viewer_comment = models.CharField(max_length=300, null=True)
+    creator_comment = models.TextField(
+        blank=True, max_length=500)
+    viewer_comment = models.TextField(blank=True, max_length=500)
 
     class Meta:
-        unique_together = ("chapter", "lang_code", "dialect_code")
         indexes = [
             models.Index(
                 fields=["chapter", "lang_code", "dialect_code"],
@@ -337,8 +353,8 @@ class Support_Loc(models.Model):
         related_name="created_support_loc",
     )
     approver = models.ForeignKey(
-        User, 
-        on_delete=models.CASCADE, 
+        User,
+        on_delete=models.CASCADE,
         null=True,
         related_name="approved_support_loc"
     )
@@ -354,7 +370,8 @@ class Support_Loc(models.Model):
 
 
 class Support_Attachment(models.Model):
-    support = models.ForeignKey(Support_Loc, null=True, on_delete=models.CASCADE)
+    support = models.ForeignKey(
+        Support_Loc, null=True, on_delete=models.CASCADE)
     lang_code = models.CharField(max_length=5)
     dialect_code = models.CharField(max_length=5)
     filename = models.CharField(max_length=255)
